@@ -1,0 +1,13 @@
+groq
+langchain>=0.2,<0.4
+langchain-community
+langchain-groq
+langchain-text-splitters
+faiss-cpu
+sentence-transformers
+gtts
+numpy
+huggingface-hub<0.28.0
+pydantic<2.10.0
+fastapi==0.112.2
+starlette==0.38.2
