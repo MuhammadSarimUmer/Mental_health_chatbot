@@ -266,154 +266,226 @@ RESOURCES_TTS = "In Pakistan, call Umang at 0317-4288665, Monday through Saturda
 
 # UI
 # UI
-# UI - MODERN GLASSMORPHISM THEME
 CUSTOM_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 :root {
-    --text-dark: #0F172A;      /* Extremely readable dark slate */
-    --text-muted: #475569;     /* Soft slate for subtitles */
-    --accent-main: #0EA5E9;    /* Vibrant, modern sky blue */
-    --accent-hover: #0284C7;
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.5);
-    --shadow-glass: 0 8px 32px rgba(15, 23, 42, 0.08);
+    --bg-main: #212121;
+    --bg-sidebar: #171717;
+    --text-primary: #ECECEC;
+    --text-secondary: #B4B4B4;
+    --border-light: rgba(255, 255, 255, 0.1);
+    --msg-user: #2F2F2F;
+    --msg-bot: transparent;
+    --input-bg: #2F2F2F;
+    --accent: #FFFFFF;
+    --accent-hover: #ECECEC;
+    --radius-full: 9999px;
     --radius-xl: 24px;
-    --radius-md: 16px;
+    --radius-lg: 16px;
+    --radius-md: 8px;
 }
 
-/* 1. Animated Mesh Gradient Background */
+/* Base Body */
 body, .gradio-container {
-    background-color: #F8FAFC !important;
-    background-image: 
-        radial-gradient(at 0% 0%, rgba(224, 242, 254, 1) 0px, transparent 50%),
-        radial-gradient(at 100% 0%, rgba(204, 251, 241, 1) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(241, 245, 249, 1) 0px, transparent 50%),
-        radial-gradient(at 0% 100%, rgba(219, 234, 254, 1) 0px, transparent 50%) !important;
-    background-attachment: fixed !important;
-    font-family: 'DM Sans', system-ui, sans-serif !important;
+    background-color: var(--bg-main) !important;
+    color: var(--text-primary) !important;
+    font-family: 'Inter', -apple-system, sans-serif !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 100vh !important;
+    overflow: hidden !important;
 }
 
-.gradio-container {
-    max-width: 1050px !important;
-    margin: 0 auto !important;
-    padding: 24px !important;
-}
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #565656; }
 
-/* 2. Force Text Colors for Readability (Overrides Gradio Dark Mode) */
-p, h1, h2, h3, h4, h5, h6, span, div, label, .output-text, .output-text p, .output-text li {
-    color: var(--text-dark) !important;
-}
+/* Force Text Colors */
+p, h1, h2, h3, h4, span, div, label, li, a { color: var(--text-primary) !important; }
+.text-muted { color: var(--text-secondary) !important; }
 
-/* 3. Hide Default Gradio Borders */
-.contain { border: none !important; background: transparent !important; }
-.tabs { border: none !important; }
-
-/* 4. Frosted Glass Panels */
-.chatbot-wrap, .output-text, .tabs > div > div {
-    background: var(--glass-bg) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    border: 1px solid var(--glass-border) !important;
-    border-radius: var(--radius-xl) !important;
-    box-shadow: var(--shadow-glass) !important;
-}
-
-/* 5. Modern Chat Bubbles */
-.chatbot-wrap { padding: 24px !important; }
-.message-wrap { gap: 20px !important; }
-
-/* User Bubble: Vibrant Gradient */
-.message.user {
-    background: linear-gradient(135deg, var(--accent-main), var(--accent-hover)) !important;
+/* Main Layout Grid */
+.main-layout {
+    display: flex !important;
+    flex-direction: row !important;
+    height: 100vh !important;
+    width: 100vw !important;
+    gap: 0 !important;
+    margin: 0 !important;
     border: none !important;
-    border-radius: 20px 20px 4px 20px !important;
-    box-shadow: 0 4px 16px rgba(14, 165, 233, 0.25) !important;
+    background: transparent !important;
 }
-.message.user p { color: #FFFFFF !important; font-weight: 500 !important; } 
 
-/* Bot Bubble: Clean White Glass */
-.message.bot {
-    background: #FFFFFF !important;
-    border: 1px solid rgba(15, 23, 42, 0.04) !important;
-    border-radius: 20px 20px 20px 4px !important;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+/* -----------------------------
+   SIDEBAR STYLING
+----------------------------- */
+.sidebar {
+    background-color: var(--bg-sidebar) !important;
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+    height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 16px 12px !important;
+    border-right: none !important;
 }
-.message.bot p { color: var(--text-dark) !important; line-height: 1.6 !important; }
 
-/* 6. Inputs & Textareas */
-textarea, input[type="text"] {
-    background: #FFFFFF !important;
-    border: 2px solid transparent !important;
-    color: var(--text-dark) !important;
+.new-chat-btn {
+    background: transparent !important;
+    color: var(--text-primary) !important;
+    border: none !important;
     border-radius: var(--radius-md) !important;
-    box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.02), 0 2px 10px rgba(15, 23, 42, 0.04) !important;
-    padding: 16px 20px !important;
-    font-size: 16px !important;
-    transition: all 0.3s ease !important;
+    padding: 12px 14px !important;
+    text-align: left !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+    transition: background 0.2s !important;
 }
-textarea::placeholder { color: #94A3B8 !important; }
-textarea:focus {
-    border-color: var(--accent-main) !important;
-    outline: none !important;
-    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15) !important;
+.new-chat-btn:hover { background: #202123 !important; }
+
+.sidebar-tools {
+    margin-top: 32px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
 }
 
-/* 7. Animated Buttons */
-button {
-    font-family: 'DM Sans', sans-serif !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.3px !important;
-    border-radius: 12px !important;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-button.primary {
-    background: var(--accent-main) !important;
-    color: #FFFFFF !important;
+.tool-btn {
+    background: transparent !important;
     border: none !important;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3) !important;
+    color: var(--text-primary) !important;
+    text-align: left !important;
+    font-size: 13px !important;
+    padding: 10px 14px !important;
+    border-radius: var(--radius-md) !important;
 }
-button.primary span { color: #FFFFFF !important; }
-button.primary:hover {
-    background: var(--accent-hover) !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4) !important;
+.tool-btn:hover { background: #202123 !important; }
+
+/* -----------------------------
+   CHAT AREA STYLING
+----------------------------- */
+.chat-container {
+    flex-grow: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    position: relative !important;
+    background-color: var(--bg-main) !important;
 }
 
-/* Small Mood Buttons */
-button.sm {
-    background: #FFFFFF !important;
-    border: 1px solid rgba(15, 23, 42, 0.08) !important;
-    border-radius: 24px !important;
-    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03) !important;
+.chatbot-wrap {
+    flex-grow: 1 !important;
+    background-color: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    overflow-y: auto !important;
+    margin-bottom: 90px !important; /* Space for input */
 }
-button.sm span { color: var(--text-muted) !important; }
-button.sm:hover {
-    border-color: var(--accent-main) !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1) !important;
-}
-button.sm:hover span { color: var(--accent-main) !important; }
 
-/* 8. Tab Navigation Styles */
-.tab-nav { border-bottom: none !important; margin-bottom: 24px !important; gap: 12px !important; }
-button.tab-nav-button {
-    background: rgba(255, 255, 255, 0.5) !important;
-    border: 1px solid rgba(15, 23, 42, 0.05) !important;
-    border-radius: 14px !important;
-    padding: 10px 20px !important;
-}
-button.tab-nav-button span { color: var(--text-muted) !important; font-weight: 500 !important; }
-button.tab-nav-button.selected {
-    background: #FFFFFF !important;
-    border-color: rgba(14, 165, 233, 0.2) !important;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06) !important;
-}
-button.tab-nav-button.selected span { color: var(--accent-main) !important; font-weight: 700 !important; }
+/* Chat Messages */
+.message-wrap { gap: 0 !important; padding: 24px 0 !important; }
 
-hr { border-color: rgba(15, 23, 42, 0.1) !important; }
+/* Center the chat content */
+.message {
+    max-width: 768px !important; /* Standard ChatGPT width */
+    margin: 0 auto !important;
+    padding: 12px 24px !important;
+    width: 100% !important;
+}
+
+/* User Message: Grey rounded bubble on the right */
+.message.user {
+    background-color: var(--msg-user) !important;
+    border: none !important;
+    border-radius: var(--radius-xl) !important;
+    width: fit-content !important;
+    max-width: 70% !important;
+    margin-left: auto !important;
+    margin-right: 24px !important;
+    padding: 12px 20px !important;
+    font-size: 16px !important;
+}
+
+/* Bot Message: Transparent, full width text */
+.message.bot {
+    background-color: var(--msg-bot) !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin-left: 0 !important;
+    font-size: 16px !important;
+}
+.message.bot p { line-height: 1.6 !important; }
+
+/* -----------------------------
+   INPUT AREA STYLING
+----------------------------- */
+.input-wrapper {
+    position: absolute !important;
+    bottom: 24px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 100% !important;
+    max-width: 768px !important;
+    padding: 0 24px !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+.input-box {
+    background-color: var(--input-bg) !important;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius-xl) !important;
+    padding: 4px 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    box-shadow: 0 0 15px rgba(0,0,0,0.1) !important;
+}
+
+textarea, input[type="text"] {
+    background-color: transparent !important;
+    border: none !important;
+    color: var(--text-primary) !important;
+    font-size: 16px !important;
+    box-shadow: none !important;
+    padding: 14px 0 !important;
+    resize: none !important;
+}
+textarea:focus { border: none !important; box-shadow: none !important; outline: none !important; }
+
+/* Send Button: White circle */
+button.send-btn {
+    background-color: var(--accent) !important;
+    color: #000000 !important;
+    border: none !important;
+    border-radius: var(--radius-full) !important;
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    padding: 0 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+}
+button.send-btn:hover { background-color: var(--accent-hover) !important; }
+button.send-btn span { color: #000000 !important; display: none; } /* Hide text if we just want a shape */
+button.send-btn::after { content: "↑"; font-size: 20px; color: black; }
+
+/* Hide default Gradio elements */
+.form { border: none !important; background: transparent !important; box-shadow: none !important; }
+footer { display: none !important; }
 """
 
+# ==========================================
+# 5. GRADIO APP DEFINITION
+# ==========================================
 def format_chat_for_gradio(history):
     messages = []
     i = 0
@@ -430,121 +502,72 @@ def on_send(message, history_state, enable_tts):
     if not message.strip():
         return history_state, format_chat_for_gradio(history_state), None, ""
     reply, audio_path, updated_history, is_crisis = chat_with_echo(message, history_state)
-    crisis_msg = ""
-    if is_crisis:
-        crisis_msg = "Crisis support activated. Please reach out: Pakistan: Umang 0317-4288665 | US: Text HOME to 741741"
+    crisis_msg = "**Crisis support activated:** Umang 0317-4288665" if is_crisis else ""
     return updated_history, format_chat_for_gradio(updated_history), (audio_path if enable_tts else None), crisis_msg
 
-def on_mood(mood, history_state, enable_tts):
-    reply, audio_path, updated_history = handle_mood(mood, history_state)
-    return updated_history, format_chat_for_gradio(updated_history), (audio_path if enable_tts else None), reply
+def clear_chat():
+    return [], [], None, ""
 
-def on_coping_tool(tool_name, enable_tts):
-    tool = COPING_TOOLS.get(tool_name)
-    if not tool:
-        return "Tool not found.", None
-    return tool["text"], (text_to_speech(tool["tts"]) if enable_tts else None)
-
-def on_resources_tts(enable_tts):
-    return text_to_speech(RESOURCES_TTS) if enable_tts else None
-
-def on_delete_chat():
-    return delete_history(), [], None, "Chat history cleared."
-
-def on_load():
-    history = load_history()
-    return history, format_chat_for_gradio(history)
-
-# Using Base theme to completely block Gradio's internal dark-mode interference
-with gr.Blocks(theme=gr.themes.Base(), css=CUSTOM_CSS, title="Echo Wellness") as app:
+# Use Base theme to block Gradio styling overrides
+with gr.Blocks(theme=gr.themes.Base(), css=CUSTOM_CSS, title="Echo") as app:
     history_state = gr.State([])
 
-    # Modernized App Header
-    gr.HTML("""
-    <div style="text-align:center;padding:40px 0 24px; animation: slideDown 0.8s ease-out;">
-        <div style="font-size:3.5rem; margin-bottom:12px; filter: drop-shadow(0 4px 6px rgba(14, 165, 233, 0.2));">🫧</div>
-        <div style="font-size:2.8rem; font-weight:700; color:#0F172A; letter-spacing:-1px;">Echo Wellness</div>
-        <div style="color:#475569; font-size:1.1rem; margin-top:4px; font-weight:500;">A modern space for your mind.</div>
-    </div>
-    <style>@keyframes slideDown { from {opacity: 0; transform: translateY(-20px);} to {opacity: 1; transform: translateY(0);} }</style>
-    """)
-
-    with gr.Tabs():
-        with gr.Tab("💬 Space"):
-            with gr.Row(equal_height=False):
-                with gr.Column(scale=7):
-                    chatbot = gr.Chatbot(label="", height=550, elem_classes=["chatbot-wrap"], type="messages", show_label=False)
-                    crisis_banner = gr.Markdown("")
-                    
-                    with gr.Row():
-                        msg_input = gr.Textbox(placeholder="Type your thoughts here... I'm listening.", show_label=False, container=False, lines=1, scale=5)
-                        send_btn = gr.Button("Send", scale=1, variant="primary")
-                    
-                    with gr.Row():
-                        tts_toggle = gr.Checkbox(label="Enable audio responses", value=False)
-                    audio_out = gr.Audio(label="Audio Output", autoplay=True, visible=False) 
-
-                with gr.Column(scale=3):
-                    gr.Markdown("<div style='font-size:1.2rem; font-weight:700; color:#0F172A; margin-bottom:16px;'>Quick Check-in</div>")
-                    mood_output = gr.Markdown("", elem_classes=["output-text"])
-                    moods = list(MOOD_PROMPTS.keys())
-                    for i in range(0, len(moods), 2):
-                        with gr.Row():
-                            b1 = gr.Button(moods[i], size="sm")
-                            b1.click(fn=on_mood, inputs=[gr.State(moods[i]), history_state, tts_toggle],
-                                     outputs=[history_state, chatbot, audio_out, mood_output])
-                            if i+1 < len(moods):
-                                b2 = gr.Button(moods[i+1], size="sm")
-                                b2.click(fn=on_mood, inputs=[gr.State(moods[i+1]), history_state, tts_toggle],
-                                         outputs=[history_state, chatbot, audio_out, mood_output])
-                    
-                    gr.Markdown("<br>")
-                    delete_btn = gr.Button("Clear Session", variant="secondary", size="sm")
-
-            send_btn.click(fn=on_send, inputs=[msg_input, history_state, tts_toggle],
-                           outputs=[history_state, chatbot, audio_out, crisis_banner]).then(lambda: "", outputs=[msg_input])
-            msg_input.submit(fn=on_send, inputs=[msg_input, history_state, tts_toggle],
-                             outputs=[history_state, chatbot, audio_out, crisis_banner]).then(lambda: "", outputs=[msg_input])
-            delete_btn.click(fn=on_delete_chat, outputs=[history_state, chatbot, audio_out, crisis_banner])
-
-        with gr.Tab("🧘‍♀️ Toolkit"):
-            coping_tts_toggle = gr.Checkbox(label="Enable guided audio", value=False)
-            with gr.Row():
-                with gr.Column(scale=3):
-                    coping_output = gr.Markdown("**Select a practice below to begin your guided exercise.**", elem_classes=["output-text"])
-                with gr.Column(scale=2):
-                    coping_audio = gr.Audio(label="Guided Audio", autoplay=True)
-            gr.Markdown("<br>")
-            with gr.Row():
-                for tool_name in COPING_TOOLS.keys():
-                    btn = gr.Button(tool_name, size="sm")
-                    btn.click(fn=on_coping_tool, inputs=[gr.State(tool_name), coping_tts_toggle],
-                              outputs=[coping_output, coping_audio])
-
-        with gr.Tab("📞 Resources"):
-            with gr.Row():
-                with gr.Column(scale=3):
-                    gr.Markdown(RESOURCES_TEXT, elem_classes=["output-text"])
-                with gr.Column(scale=2):
-                    res_tts_toggle = gr.Checkbox(label="Enable audio reading", value=False)
-                    read_btn = gr.Button("Read Aloud", variant="primary")
-                    resources_audio = gr.Audio(label="Audio Output", autoplay=True)
-            read_btn.click(fn=on_resources_tts, inputs=[res_tts_toggle], outputs=[resources_audio])
-
-        with gr.Tab("ℹ️ About"):
-            gr.Markdown("""
-            ### Welcome to Echo Wellness
-            Echo is designed to provide a safe, comforting space to process your thoughts and guide you through evidence-based coping mechanisms.
+    with gr.Row(elem_classes=["main-layout"]):
+        
+        # --- LEFT SIDEBAR ---
+        with gr.Column(elem_classes=["sidebar"], scale=0):
+            # ChatGPT "New Chat" styling
+            new_chat_btn = gr.Button("Echo Wellness", elem_classes=["new-chat-btn"])
             
-            **How it works:**
-            *   **Privacy First:** Your sessions are completely private. We use a temporary memory system, meaning your conversations are cleared when your session ends.
-            *   **Clinical Literature:** The guidance provided is strictly sourced from established cognitive behavioral techniques and mindfulness practices.
+            gr.Markdown("<div style='margin-top:24px; font-size:12px; color:#B4B4B4; padding-left:14px; font-weight:600;'>TOOLS & SETTINGS</div>")
             
-            *Disclaimer: Echo Wellness is an automated support tool and is not a substitute for professional medical advice, diagnosis, or treatment. If you are experiencing a crisis, please navigate to the Resources tab to contact a professional.*
-            """, elem_classes=["output-text"])
+            tts_toggle = gr.Checkbox(label="Voice Output", value=False, elem_classes=["tool-btn"])
+            clear_btn = gr.Button("Clear Conversation", elem_classes=["tool-btn"])
+            
+            gr.Markdown("<div style='margin-top:auto; font-size:12px; color:#B4B4B4; padding-left:14px;'>Echo UI v2.0</div>")
 
-    gr.HTML("<div style='text-align:center;padding:32px;color:#94A3B8;font-size:0.9rem;font-weight:500;'>Your well-being matters.</div>")
-    app.load(fn=on_load, outputs=[history_state, chatbot])
+        # --- RIGHT MAIN CHAT AREA ---
+        with gr.Column(elem_classes=["chat-container"], scale=1):
+            
+            crisis_banner = gr.Markdown("", visible=True)
+            
+            # The Chat Display
+            chatbot = gr.Chatbot(
+                label="", 
+                elem_classes=["chatbot-wrap"], 
+                type="messages", 
+                show_label=False,
+                height=800
+            )
+            
+            audio_out = gr.Audio(label="", autoplay=True, visible=False) 
+
+            # The Bottom Input Area
+            with gr.Column(elem_classes=["input-wrapper"]):
+                with gr.Row(elem_classes=["input-box"]):
+                    msg_input = gr.Textbox(
+                        placeholder="Message Echo...", 
+                        show_label=False, 
+                        container=False, 
+                        lines=1,
+                        scale=9
+                    )
+                    send_btn = gr.Button("", elem_classes=["send-btn"], scale=1)
+
+    # Event Listeners
+    send_btn.click(
+        fn=on_send, 
+        inputs=[msg_input, history_state, tts_toggle],
+        outputs=[history_state, chatbot, audio_out, crisis_banner]
+    ).then(lambda: "", outputs=[msg_input])
+    
+    msg_input.submit(
+        fn=on_send, 
+        inputs=[msg_input, history_state, tts_toggle],
+        outputs=[history_state, chatbot, audio_out, crisis_banner]
+    ).then(lambda: "", outputs=[msg_input])
+    
+    clear_btn.click(fn=clear_chat, outputs=[history_state, chatbot, audio_out, crisis_banner])
 
 if __name__ == "__main__":
     app.launch()
