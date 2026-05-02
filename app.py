@@ -130,15 +130,6 @@ MOOD_PROMPTS = {
     "😶 Numb":     "The user is feeling numb. Normalize as protective response, suggest gentle grounding.",
 }
 
-COPING_TOOLS = {
-    "🫁 Box Breathing":       "Guide me through box breathing step by step right now.",
-    "🌱 5-4-3-2-1 Grounding": "Walk me through the 5-4-3-2-1 grounding technique right now.",
-    "🧠 Thought Reframing":   "Help me reframe a negative thought using CBT techniques.",
-    "🧘 Body Scan":           "Guide me through a body scan meditation right now.",
-    "🙏 Gratitude Practice":  "Guide me through a gratitude practice right now.",
-    "💪 Affirmations":        "Give me powerful affirmations for right now.",
-}
-
 def format_for_gradio(history):
     messages = []
     i = 0
@@ -159,10 +150,23 @@ def on_send(message, history_state, enable_tts):
     audio = text_to_speech(reply) if enable_tts else None
     return updated, format_for_gradio(updated), audio, crisis_msg
 
-def on_quick(message, history_state, enable_tts):
-    if not message.strip():
+def on_pill(pill_value, history_state, enable_tts):
+    if not pill_value or '::' not in pill_value:
         return history_state, format_for_gradio(history_state), None, ""
-    reply, updated, is_crisis = chat_with_echo(message, history_state)
+    pill_type, value = pill_value.split('::', 1)
+    if pill_type == 'mood':
+        msg = f"I'm feeling {value.split(' ', 1)[-1] if ' ' in value else value}"
+    else:
+        tool_map = {
+            "🫁 Box Breathing":       "Guide me through box breathing step by step right now.",
+            "🌱 5-4-3-2-1 Grounding": "Walk me through the 5-4-3-2-1 grounding technique right now.",
+            "🧠 Thought Reframing":   "Help me reframe a negative thought using CBT techniques.",
+            "🧘 Body Scan":           "Guide me through a body scan meditation right now.",
+            "🙏 Gratitude Practice":  "Guide me through a gratitude practice right now.",
+            "💪 Affirmations":        "Give me powerful affirmations for right now.",
+        }
+        msg = tool_map.get(value, value)
+    reply, updated, _ = chat_with_echo(msg, history_state)
     audio = text_to_speech(reply) if enable_tts else None
     return updated, format_for_gradio(updated), audio, ""
 
@@ -173,357 +177,189 @@ CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Syne:wght@400;500;600&display=swap');
 
 :root {
-    --bg:       #0d0f14;
-    --bg2:      #13161d;
-    --bg3:      #1a1d26;
-    --bg4:      #20242e;
-    --border:   #2a2d38;
-    --border2:  #343844;
-    --text:     #e8eaf0;
-    --text2:    #9ba3b4;
-    --text3:    #555e72;
-    --green:    #4ade80;
-    --green2:   #22c55e;
-    --gdim:     #1a3d27;
-    --amber:    #fbbf24;
-    --red:      #f87171;
-    --rdim:     #3d1515;
+    --bg:    #0d0f14;  --bg2: #13161d;  --bg3: #1a1d26;  --bg4: #20242e;
+    --border: #2a2d38; --border2: #343844;
+    --text: #e8eaf0;   --text2: #9ba3b4; --text3: #555e72;
+    --green: #4ade80;  --green2: #22c55e;
+    --amber: #fbbf24;  --red: #f87171;   --rdim: #3d1515;
 }
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 html, body { background: var(--bg) !important; height: 100%; }
-
 .gradio-container {
-    background: var(--bg) !important;
-    color: var(--text) !important;
+    background: var(--bg) !important; color: var(--text) !important;
     font-family: 'Syne', system-ui, sans-serif !important;
-    max-width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
+    max-width: 100% !important; padding: 0 !important; margin: 0 !important;
 }
-
 footer, .footer, .svelte-1ax1toq { display: none !important; }
 .contain { padding: 0 !important; }
 .gap { gap: 0 !important; }
-.form, .gr-form, .gr-group {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
+.form, .gr-form, .gr-group { background: transparent !important; border: none !important; box-shadow: none !important; }
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
 
-/* ── HEADER ───────────────────────────────── */
+/* HEADER */
 #echo-hdr {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 14px;
-    background: var(--bg2);
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 0;
-    z-index: 200;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: var(--bg2); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 200;
 }
 .h-left { display: flex; align-items: center; gap: 9px; }
 .h-orb {
     width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
     background: radial-gradient(circle at 35% 30%, #86efac, #4ade80 55%, #15803d);
     font-size: 13px; display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 12px rgba(74,222,128,0.45);
-    animation: hglow 3s ease-in-out infinite;
+    box-shadow: 0 0 12px rgba(74,222,128,.45); animation: hglow 3s ease-in-out infinite;
 }
-@keyframes hglow {
-    0%,100% { box-shadow: 0 0 8px rgba(74,222,128,0.3); }
-    50%      { box-shadow: 0 0 20px rgba(74,222,128,0.6); }
-}
-.h-title {
-    font-family: 'Playfair Display', serif !important;
-    font-size: 16px !important; font-weight: 700 !important;
-    color: var(--text) !important; line-height: 1.1 !important;
-}
-.h-sub { font-size: 10px !important; color: var(--text3) !important; margin-top: 1px !important; }
+@keyframes hglow { 0%,100%{box-shadow:0 0 8px rgba(74,222,128,.3)} 50%{box-shadow:0 0 20px rgba(74,222,128,.6)} }
+.h-title { font-family:'Playfair Display',serif !important; font-size:16px !important; font-weight:700 !important; color:var(--text) !important; line-height:1.1 !important; }
+.h-sub   { font-size:10px !important; color:var(--text3) !important; margin-top:1px !important; }
 .h-badge {
-    display: flex; align-items: center; gap: 4px;
-    font-size: 9px; color: var(--green); font-weight: 600;
-    letter-spacing: 0.07em; text-transform: uppercase;
-    background: rgba(74,222,128,0.07);
-    border: 1px solid rgba(74,222,128,0.2);
-    padding: 3px 9px; border-radius: 99px;
+    display:flex; align-items:center; gap:4px; font-size:9px; color:var(--green);
+    font-weight:600; letter-spacing:.07em; text-transform:uppercase;
+    background:rgba(74,222,128,.07); border:1px solid rgba(74,222,128,.2);
+    padding:3px 9px; border-radius:99px;
 }
-.h-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--green); animation: blink 2.5s infinite; }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.15} }
+.h-dot { width:4px; height:4px; border-radius:50%; background:var(--green); animation:blink 2.5s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
 
-/* ── TABS ─────────────────────────────────── */
-.tabs > .tab-nav {
-    background: var(--bg2) !important;
-    border-bottom: 1px solid var(--border) !important;
-    padding: 0 12px !important;
-    gap: 0 !important;
-}
-.tab-nav button {
-    font-family: 'Syne', sans-serif !important;
-    font-size: 11px !important; font-weight: 500 !important;
-    color: var(--text3) !important;
-    background: transparent !important; border: none !important;
-    border-bottom: 2px solid transparent !important;
-    padding: 9px 12px !important; border-radius: 0 !important;
-    transition: all 0.2s !important; white-space: nowrap !important;
-}
-.tab-nav button:hover { color: var(--text2) !important; }
-.tab-nav button.selected, .tab-nav button[aria-selected="true"] {
-    color: var(--green) !important;
-    border-bottom-color: var(--green) !important;
-    font-weight: 600 !important;
-}
+/* TABS */
+.tabs > .tab-nav { background:var(--bg2) !important; border-bottom:1px solid var(--border) !important; padding:0 12px !important; gap:0 !important; }
+.tab-nav button { font-family:'Syne',sans-serif !important; font-size:11px !important; font-weight:500 !important; color:var(--text3) !important; background:transparent !important; border:none !important; border-bottom:2px solid transparent !important; padding:9px 12px !important; border-radius:0 !important; transition:all .2s !important; white-space:nowrap !important; }
+.tab-nav button:hover { color:var(--text2) !important; }
+.tab-nav button.selected, .tab-nav button[aria-selected="true"] { color:var(--green) !important; border-bottom-color:var(--green) !important; font-weight:600 !important; }
 
-/* ── CRISIS BANNER ────────────────────────── */
-#crisis-out .prose, #crisis-out p {
-    background: rgba(248,113,113,0.07) !important;
-    border-bottom: 1px solid rgba(248,113,113,0.2) !important;
-    padding: 8px 14px !important;
-    font-size: 12px !important;
-    color: var(--red) !important;
-    margin: 0 !important;
-}
-#crisis-out strong { color: var(--red) !important; }
-#crisis-out:empty, #crisis-out .prose:empty { display: none !important; padding: 0 !important; }
+/* CRISIS */
+#crisis-out .prose, #crisis-out p { background:rgba(248,113,113,.07) !important; border-bottom:1px solid rgba(248,113,113,.2) !important; padding:8px 14px !important; font-size:12px !important; color:var(--red) !important; margin:0 !important; }
+#crisis-out strong { color:var(--red) !important; }
+#crisis-out:empty, #crisis-out .prose:empty { display:none !important; padding:0 !important; }
 
-/* ── PILL BARS ────────────────────────────── */
-.pill-bar {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 5px !important;
-    padding: 8px 12px !important;
-    background: var(--bg2) !important;
-    border-bottom: 1px solid var(--border) !important;
-    align-items: center !important;
-}
-.pill-bar-label {
-    font-size: 9px !important;
-    color: var(--text3) !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.07em !important;
-    text-transform: uppercase !important;
-    margin-right: 3px !important;
-    flex-shrink: 0 !important;
-    align-self: center !important;
-}
+/* PILLS */
+.pill-bar { display:flex !important; flex-wrap:wrap !important; gap:5px !important; padding:8px 12px !important; background:var(--bg2) !important; border-bottom:1px solid var(--border) !important; align-items:center !important; }
+.pill-bar-label { font-size:9px !important; color:var(--text3) !important; font-weight:600 !important; letter-spacing:.07em !important; text-transform:uppercase !important; margin-right:3px !important; flex-shrink:0 !important; align-self:center !important; }
+.echo-pill { display:inline-flex !important; align-items:center !important; background:var(--bg3) !important; border:1px solid var(--border2) !important; color:var(--text2) !important; font-family:'Syne',sans-serif !important; font-size:11px !important; font-weight:500 !important; padding:4px 11px !important; border-radius:99px !important; cursor:pointer !important; transition:all .15s !important; white-space:nowrap !important; line-height:1.4 !important; -webkit-tap-highlight-color:transparent !important; user-select:none !important; }
+.echo-pill:hover, .echo-pill:active { background:var(--bg4) !important; border-color:rgba(74,222,128,.4) !important; color:var(--green) !important; }
+.echo-pill-tool { background:transparent !important; border-color:var(--border) !important; color:var(--text3) !important; font-size:10px !important; padding:3px 10px !important; }
+.echo-pill-tool:hover, .echo-pill-tool:active { background:rgba(74,222,128,.05) !important; border-color:rgba(74,222,128,.3) !important; color:var(--green) !important; }
 
-/* Native HTML pills — no Gradio interference */
-.echo-pill {
-    display: inline-flex !important;
-    align-items: center !important;
-    background: var(--bg3) !important;
-    border: 1px solid var(--border2) !important;
-    color: var(--text2) !important;
-    font-family: 'Syne', sans-serif !important;
-    font-size: 11px !important;
-    font-weight: 500 !important;
-    padding: 4px 11px !important;
-    border-radius: 99px !important;
-    cursor: pointer !important;
-    transition: all 0.15s !important;
-    white-space: nowrap !important;
-    line-height: 1.4 !important;
-    -webkit-tap-highlight-color: transparent !important;
-    user-select: none !important;
-}
-.echo-pill:hover, .echo-pill:active {
-    background: var(--bg4) !important;
-    border-color: rgba(74,222,128,0.4) !important;
-    color: var(--green) !important;
-}
-.echo-pill-tool {
-    background: transparent !important;
-    border-color: var(--border) !important;
-    color: var(--text3) !important;
-    font-size: 10px !important;
-    padding: 3px 10px !important;
-}
-.echo-pill-tool:hover, .echo-pill-tool:active {
-    background: rgba(74,222,128,0.05) !important;
-    border-color: rgba(74,222,128,0.3) !important;
-    color: var(--green) !important;
-}
+/* CHATBOT */
+#chatbot-main { background:transparent !important; border:none !important; }
+#chatbot-main > div { background:transparent !important; border:none !important; }
+.message-wrap { padding:4px 12px !important; }
+.user .message, .user > div { background:var(--bg3) !important; border:1px solid var(--border2) !important; color:var(--text) !important; border-radius:16px 16px 3px 16px !important; font-size:13px !important; line-height:1.7 !important; padding:10px 14px !important; max-width:80% !important; margin-left:auto !important; font-family:'Syne',sans-serif !important; }
+.bot .message, .bot > div { background:transparent !important; border:none !important; color:var(--text) !important; font-size:13px !important; line-height:1.8 !important; padding:8px 2px !important; font-family:'Syne',sans-serif !important; }
+.bot .message strong, .bot > div strong { color:var(--green) !important; font-weight:600 !important; }
+.bot .message em, .bot > div em { color:var(--amber) !important; }
+.bot .message code, .bot > div code { background:rgba(74,222,128,.1) !important; color:var(--green) !important; padding:1px 5px !important; border-radius:4px !important; font-size:11px !important; }
+.bot .message ul, .bot .message ol, .bot > div ul, .bot > div ol { padding-left:16px !important; margin:4px 0 !important; }
+.bot .message li, .bot > div li { margin-bottom:3px !important; font-size:13px !important; }
+.avatar-container { display:none !important; }
 
-/* ── CHATBOT ──────────────────────────────── */
-#chatbot-main {
-    background: transparent !important;
-    border: none !important;
-}
-#chatbot-main > div { background: transparent !important; border: none !important; }
-
-.message-wrap { padding: 4px 12px !important; }
-
-.user .message, .user > div {
-    background: var(--bg3) !important;
-    border: 1px solid var(--border2) !important;
-    color: var(--text) !important;
-    border-radius: 16px 16px 3px 16px !important;
-    font-size: 13px !important; line-height: 1.7 !important;
-    padding: 10px 14px !important;
-    max-width: 80% !important;
-    margin-left: auto !important;
-    font-family: 'Syne', sans-serif !important;
-}
-.bot .message, .bot > div {
-    background: transparent !important;
-    border: none !important;
-    color: var(--text) !important;
-    font-size: 13px !important; line-height: 1.8 !important;
-    padding: 8px 2px !important;
-    font-family: 'Syne', sans-serif !important;
-}
-.bot .message strong, .bot > div strong { color: var(--green) !important; font-weight: 600 !important; }
-.bot .message em, .bot > div em { color: var(--amber) !important; }
-.bot .message code, .bot > div code {
-    background: rgba(74,222,128,0.1) !important; color: var(--green) !important;
-    padding: 1px 5px !important; border-radius: 4px !important; font-size: 11px !important;
-}
-.bot .message ul, .bot .message ol,
-.bot > div ul, .bot > div ol { padding-left: 16px !important; margin: 4px 0 !important; }
-.bot .message li, .bot > div li { margin-bottom: 3px !important; font-size: 13px !important; }
-
-.avatar-container { display: none !important; }
-
-/* ── BOTTOM BAR ───────────────────────────── */
-#bottom-bar {
+/* BOTTOM BAR */
+#bottom-bar-row {
     background: var(--bg2) !important;
     border-top: 1px solid var(--border) !important;
-    padding: 8px 12px !important;
+    padding: 7px 14px !important;
     display: flex !important;
     align-items: center !important;
     gap: 10px !important;
-    flex-wrap: nowrap !important;
 }
 
-/* TTS toggle — compact */
-#tts-toggle {
+/* ── TTS CHECKBOX styled as a pill toggle ── */
+#tts-checkbox {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    min-width: unset !important;
+}
+#tts-checkbox label {
     display: flex !important;
     align-items: center !important;
-    gap: 5px !important;
+    gap: 7px !important;
     cursor: pointer !important;
-    flex-shrink: 0 !important;
-    -webkit-tap-highlight-color: transparent !important;
+    font-family: 'Syne', sans-serif !important;
+    font-size: 11px !important;
+    color: var(--text3) !important;
+    user-select: none !important;
+    white-space: nowrap !important;
 }
-#tts-track {
-    width: 34px !important; height: 18px !important;
+/* Replace native checkbox with CSS toggle track */
+#tts-checkbox input[type="checkbox"] {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 34px !important;
+    height: 18px !important;
     background: var(--border2) !important;
     border-radius: 99px !important;
+    border: none !important;
+    outline: none !important;
+    cursor: pointer !important;
     position: relative !important;
-    transition: background 0.2s !important;
     flex-shrink: 0 !important;
+    transition: background 0.2s !important;
+    margin: 0 !important;
 }
-#tts-track.on { background: var(--green) !important; }
-#tts-thumb {
-    width: 14px !important; height: 14px !important;
-    background: white !important; border-radius: 50% !important;
-    position: absolute !important; top: 2px !important; left: 2px !important;
+#tts-checkbox input[type="checkbox"]::after {
+    content: '' !important;
+    display: block !important;
+    width: 14px !important;
+    height: 14px !important;
+    background: #fff !important;
+    border-radius: 50% !important;
+    position: absolute !important;
+    top: 2px !important;
+    left: 2px !important;
     transition: left 0.2s !important;
+    pointer-events: none !important;
 }
-#tts-track.on #tts-thumb { left: 18px !important; }
-#tts-label { font-size: 11px !important; color: var(--text3) !important; font-family: 'Syne', sans-serif !important; }
+#tts-checkbox input[type="checkbox"]:checked {
+    background: var(--green) !important;
+}
+#tts-checkbox input[type="checkbox"]:checked::after {
+    left: 18px !important;
+}
 
-/* Clear button — compact text link style */
-#clear-btn-html {
+/* CLEAR BUTTON */
+#clear-btn {
     margin-left: auto !important;
+}
+#clear-btn button {
     background: transparent !important;
-    border: 1px solid rgba(248,113,113,0.25) !important;
+    border: 1px solid rgba(248,113,113,0.3) !important;
     color: var(--red) !important;
     font-family: 'Syne', sans-serif !important;
     font-size: 11px !important;
-    padding: 4px 12px !important;
+    padding: 4px 14px !important;
     border-radius: 99px !important;
     cursor: pointer !important;
-    flex-shrink: 0 !important;
+    box-shadow: none !important;
     transition: all 0.15s !important;
-    -webkit-tap-highlight-color: transparent !important;
 }
-#clear-btn-html:hover, #clear-btn-html:active {
+#clear-btn button:hover {
     background: var(--rdim) !important;
     border-color: var(--red) !important;
 }
 
-/* ── INPUT AREA ───────────────────────────── */
-#input-area {
-    padding: 8px 12px 10px !important;
-    background: var(--bg) !important;
-    border-top: 1px solid var(--border) !important;
-}
-#input-inner {
-    display: flex !important;
-    align-items: flex-end !important;
-    gap: 7px !important;
-    background: var(--bg2) !important;
-    border: 1.5px solid var(--border2) !important;
-    border-radius: 14px !important;
-    padding: 5px 5px 5px 14px !important;
-    transition: border-color 0.2s, box-shadow 0.2s !important;
-}
-#input-inner:focus-within {
-    border-color: rgba(74,222,128,0.45) !important;
-    box-shadow: 0 0 0 3px rgba(74,222,128,0.07) !important;
-}
-#msg-input {
-    flex: 1 !important;
-    background: transparent !important;
-    border: none !important; box-shadow: none !important; outline: none !important;
-}
-#msg-input textarea, #msg-input input {
-    background: transparent !important;
-    border: none !important; box-shadow: none !important; outline: none !important;
-    color: var(--text) !important;
-    font-family: 'Syne', sans-serif !important;
-    font-size: 14px !important; line-height: 1.5 !important;
-    resize: none !important;
-    padding: 6px 0 !important;
-    min-height: 36px !important; max-height: 120px !important;
-}
-#msg-input textarea::placeholder { color: var(--text3) !important; }
+/* INPUT */
+#input-area { padding:8px 12px 10px !important; background:var(--bg) !important; border-top:1px solid var(--border) !important; }
+#input-inner { display:flex !important; align-items:flex-end !important; gap:7px !important; background:var(--bg2) !important; border:1.5px solid var(--border2) !important; border-radius:14px !important; padding:5px 5px 5px 14px !important; transition:border-color .2s,box-shadow .2s !important; }
+#input-inner:focus-within { border-color:rgba(74,222,128,.45) !important; box-shadow:0 0 0 3px rgba(74,222,128,.07) !important; }
+#msg-input { flex:1 !important; background:transparent !important; border:none !important; box-shadow:none !important; outline:none !important; }
+#msg-input textarea, #msg-input input { background:transparent !important; border:none !important; box-shadow:none !important; outline:none !important; color:var(--text) !important; font-family:'Syne',sans-serif !important; font-size:14px !important; line-height:1.5 !important; resize:none !important; padding:6px 0 !important; min-height:36px !important; max-height:120px !important; }
+#msg-input textarea::placeholder { color:var(--text3) !important; }
+#send-btn { width:34px !important; height:34px !important; min-width:34px !important; border-radius:50% !important; background:var(--green) !important; border:none !important; color:#071a0f !important; font-size:16px !important; font-weight:900 !important; display:flex !important; align-items:center !important; justify-content:center !important; cursor:pointer !important; flex-shrink:0 !important; transition:all .18s !important; padding:0 !important; margin-bottom:1px !important; line-height:1 !important; }
+#send-btn:hover { background:var(--green2) !important; transform:scale(1.08) !important; }
+#send-btn:disabled { opacity:.25 !important; transform:none !important; }
+.input-hint { text-align:center !important; font-size:10px !important; color:var(--text3) !important; margin-top:6px !important; line-height:1.5 !important; font-family:'Syne',sans-serif !important; }
+#audio-out { display:none !important; }
 
-#send-btn {
-    width: 34px !important; height: 34px !important; min-width: 34px !important;
-    border-radius: 50% !important;
-    background: var(--green) !important; border: none !important;
-    color: #071a0f !important; font-size: 16px !important; font-weight: 900 !important;
-    display: flex !important; align-items: center !important; justify-content: center !important;
-    cursor: pointer !important; flex-shrink: 0 !important;
-    transition: all 0.18s !important; padding: 0 !important; margin-bottom: 1px !important;
-    line-height: 1 !important;
-}
-#send-btn:hover { background: var(--green2) !important; transform: scale(1.08) !important; }
-#send-btn:disabled { opacity: 0.25 !important; transform: none !important; }
-
-.input-hint {
-    text-align: center !important;
-    font-size: 10px !important; color: var(--text3) !important;
-    margin-top: 6px !important; line-height: 1.5 !important;
-    font-family: 'Syne', sans-serif !important;
-}
-
-#audio-out { display: none !important; }
-
-/* ── RESOURCES TAB ────────────────────────── */
-.res-wrap { padding: 12px; }
-.res-card {
-    background: var(--bg2); border: 1px solid var(--border);
-    border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
-}
-.res-card h3 {
-    font-family: 'Playfair Display', serif !important;
-    font-size: 13px !important; margin-bottom: 9px !important;
-}
-.res-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 6px 9px; background: var(--bg3); border-radius: 7px;
-    margin-bottom: 4px; border: 1px solid var(--border);
-}
-.res-name { font-size: 12px !important; font-weight: 600 !important; color: var(--text) !important; }
-.res-desc { font-size: 10px !important; color: var(--text3) !important; }
-.res-num  { font-size: 11px !important; font-weight: 700 !important; flex-shrink: 0; margin-left: 8px; }
+/* RESOURCES */
+.res-wrap { padding:12px; }
+.res-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:10px; }
+.res-card h3 { font-family:'Playfair Display',serif !important; font-size:13px !important; margin-bottom:9px !important; }
+.res-row { display:flex; justify-content:space-between; align-items:center; padding:6px 9px; background:var(--bg3); border-radius:7px; margin-bottom:4px; border:1px solid var(--border); }
+.res-name { font-size:12px !important; font-weight:600 !important; color:var(--text) !important; }
+.res-desc { font-size:10px !important; color:var(--text3) !important; }
+.res-num  { font-size:11px !important; font-weight:700 !important; flex-shrink:0; margin-left:8px; }
 """
 
 RESOURCES_HTML = """<div class="res-wrap">
@@ -550,9 +386,8 @@ RESOURCES_HTML = """<div class="res-wrap">
   </div>
 </div>"""
 
-# Pure HTML pill bars + custom toggle + clear — no Gradio buttons
 MOOD_BAR_HTML = """
-<div class="pill-bar" id="mood-bar">
+<div class="pill-bar">
   <span class="pill-bar-label">Mood</span>
   <button class="echo-pill" onclick="echoPill('mood','😊 Happy')">😊 Happy</button>
   <button class="echo-pill" onclick="echoPill('mood','😢 Sad')">😢 Sad</button>
@@ -565,7 +400,7 @@ MOOD_BAR_HTML = """
 </div>"""
 
 TOOL_BAR_HTML = """
-<div class="pill-bar" id="tool-bar">
+<div class="pill-bar">
   <span class="pill-bar-label">Tools</span>
   <button class="echo-pill echo-pill-tool" onclick="echoPill('tool','🫁 Box Breathing')">🫁 Box Breathing</button>
   <button class="echo-pill echo-pill-tool" onclick="echoPill('tool','🌱 5-4-3-2-1 Grounding')">🌱 Grounding</button>
@@ -575,79 +410,28 @@ TOOL_BAR_HTML = """
   <button class="echo-pill echo-pill-tool" onclick="echoPill('tool','💪 Affirmations')">💪 Affirmations</button>
 </div>"""
 
-BOTTOM_BAR_HTML = """
-<div id="bottom-bar">
-  <div id="tts-toggle" onclick="echoToggleTTS()">
-    <div id="tts-track"><div id="tts-thumb"></div></div>
-    <span id="tts-label">Voice off</span>
-  </div>
-  <button id="clear-btn-html" onclick="echoClear()">🗑 Clear</button>
-</div>"""
-
-# JS bridge: HTML pills → hidden Gradio textbox → Python
+# Minimal JS — only pills, no TTS hackery needed
 BRIDGE_JS = """
 <script>
-var _echoTTS = false;
-
-function echoToggleTTS() {
-    _echoTTS = !_echoTTS;
-    var track = document.getElementById('tts-track');
-    var label = document.getElementById('tts-label');
-    if (track) track.classList.toggle('on', _echoTTS);
-    if (label) label.textContent = _echoTTS ? 'Voice on' : 'Voice off';
-    // sync to Gradio checkbox
-    var cb = document.querySelector('#tts-checkbox input[type=checkbox]');
-    if (cb && cb.checked !== _echoTTS) { cb.click(); }
-}
-
 function echoPill(type, value) {
     var box = document.querySelector('#pill-bridge textarea');
     if (!box) return;
-    var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-    nativeInputValueSetter.call(box, type + '::' + value);
+    var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(box, type + '::' + value);
     box.dispatchEvent(new Event('input', { bubbles: true }));
     setTimeout(function() {
         var btn = document.querySelector('#pill-send-btn');
         if (btn) btn.click();
     }, 80);
 }
-
-function echoClear() {
-    var btn = document.querySelector('#clear-btn-gradio');
-    if (btn) btn.click();
-}
 </script>
 """
-
-def on_pill(pill_value, history_state, enable_tts):
-    if not pill_value or '::' not in pill_value:
-        return history_state, format_for_gradio(history_state), None, ""
-    pill_type, value = pill_value.split('::', 1)
-    if pill_type == 'mood':
-        prompt = MOOD_PROMPTS.get(value, f"User feels {value}. Respond empathetically.")
-        msg = f"I'm feeling {value.split(' ', 1)[-1] if ' ' in value else value}"
-    else:
-        tool_map = {
-            "🫁 Box Breathing":       "Guide me through box breathing step by step right now.",
-            "🌱 5-4-3-2-1 Grounding": "Walk me through the 5-4-3-2-1 grounding technique right now.",
-            "🧠 Thought Reframing":   "Help me reframe a negative thought using CBT techniques.",
-            "🧘 Body Scan":           "Guide me through a body scan meditation right now.",
-            "🙏 Gratitude Practice":  "Guide me through a gratitude practice right now.",
-            "💪 Affirmations":        "Give me powerful affirmations for right now.",
-        }
-        prompt = tool_map.get(value, value)
-        msg = prompt
-    reply, updated, _ = chat_with_echo(msg, history_state)
-    audio = text_to_speech(reply) if enable_tts else None
-    return updated, format_for_gradio(updated), audio, ""
 
 with gr.Blocks(theme=gr.themes.Base(), css=CSS, title="Echo — Wellness") as app:
     history_state = gr.State([])
 
-    # Inject JS bridge
     gr.HTML(BRIDGE_JS)
 
-    # Header
     gr.HTML("""<div id="echo-hdr">
       <div class="h-left">
         <div class="h-orb">🌿</div>
@@ -661,17 +445,12 @@ with gr.Blocks(theme=gr.themes.Base(), css=CSS, title="Echo — Wellness") as ap
 
     with gr.Tabs():
 
-        # ── TAB 1: CHAT ──────────────────────────────────────────
         with gr.Tab("💬 Chat"):
 
             crisis_out = gr.Markdown("", elem_id="crisis-out")
-
-            # Mood pills (pure HTML)
             gr.HTML(MOOD_BAR_HTML)
-            # Tool pills (pure HTML)
             gr.HTML(TOOL_BAR_HTML)
 
-            # Chatbot
             chatbot = gr.Chatbot(
                 label="", elem_id="chatbot-main",
                 type="messages", show_label=False,
@@ -689,15 +468,29 @@ with gr.Blocks(theme=gr.themes.Base(), css=CSS, title="Echo — Wellness") as ap
 
             audio_out = gr.Audio(label="", autoplay=True, elem_id="audio-out", visible=False)
 
-            # Bottom bar (pure HTML: TTS toggle + Clear)
-            gr.HTML(BOTTOM_BAR_HTML)
+            # ── BOTTOM BAR ──
+            # tts_checkbox is a real native Gradio Checkbox — no JS sync needed.
+            # CSS above gives it the visual toggle appearance.
+            with gr.Row(elem_id="bottom-bar-row"):
+                tts_checkbox = gr.Checkbox(
+                    value=False,
+                    label="🔊 Voice",
+                    elem_id="tts-checkbox",
+                    container=False,
+                    scale=0,
+                    min_width=100,
+                )
+                clear_btn = gr.Button(
+                    "🗑 Clear",
+                    elem_id="clear-btn",
+                    scale=0,
+                    min_width=80,
+                )
 
-            # Hidden elements for JS bridge
+            # Hidden pill bridge
             with gr.Row(visible=False):
-                tts_checkbox = gr.Checkbox(value=False, elem_id="tts-checkbox")
-                clear_btn    = gr.Button("clear", elem_id="clear-btn-gradio")
-                pill_bridge  = gr.Textbox(value="", elem_id="pill-bridge")
-                pill_send    = gr.Button("send", elem_id="pill-send-btn")
+                pill_bridge = gr.Textbox(value="", elem_id="pill-bridge")
+                pill_send   = gr.Button("send", elem_id="pill-send-btn")
 
             # Input area
             with gr.Column(elem_id="input-area"):
@@ -717,11 +510,10 @@ with gr.Blocks(theme=gr.themes.Base(), css=CSS, title="Echo — Wellness") as ap
                     · <strong style="color:#555e72">116 123</strong> (UK)
                 </div>""")
 
-        # ── TAB 2: RESOURCES ─────────────────────────────────────
         with gr.Tab("📞 Resources"):
             gr.HTML(RESOURCES_HTML)
 
-    # ── WIRING ───────────────────────────────────────────────────
+    # ── WIRING ──
     send_btn.click(
         fn=on_send,
         inputs=[msg_input, history_state, tts_checkbox],
