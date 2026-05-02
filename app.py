@@ -1,5 +1,4 @@
-import os, json, re, datetime, tempfile
-from pathlib import Path
+import os, re, tempfile
 from gtts import gTTS
 from groq import Groq
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -8,70 +7,48 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.docstore.document import Document
 import gradio as gr
 
-# API KEY - reads from HuggingFace Secret
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 if not GROQ_API_KEY:
-    raise ValueError("GROQ_API_KEY secret not set. Add it in Space Settings > Secrets.")
+    raise ValueError("GROQ_API_KEY secret not set.")
 os.environ["GROQ_API_KEY"] = GROQ_API_KEY
 
-# 1. KNOWLEDGE BASE
 MENTAL_HEALTH_DOCS = [
     """Anxiety is a natural response to stress. Common symptoms include racing heart, sweating, trembling, shortness of breath, and persistent worry.
     Cognitive Behavioral Therapy (CBT) is highly effective for anxiety. It helps identify and challenge distorted thought patterns.
     Grounding techniques like the 5-4-3-2-1 method can interrupt anxiety spirals: name 5 things you see, 4 you can touch, 3 you hear, 2 you smell, 1 you taste.
     Regular exercise, especially aerobic activity for 30 minutes 3-5 times a week, significantly reduces anxiety symptoms.
     Limiting caffeine and alcohol can reduce anxiety. Both substances can trigger or worsen symptoms.""",
-
     """Depression involves persistent sadness, loss of interest, changes in sleep and appetite, fatigue, and feelings of worthlessness.
     Behavioral activation means scheduling small enjoyable activities and is a core depression treatment.
     Sleep hygiene is critical. Consistent sleep and wake times and limiting screens before bed improve mood significantly.
     Social connection is protective. Isolation worsens depression. Even brief social contact helps.
     Self-compassion involves treating yourself with the same kindness you would offer a good friend.""",
-
     """Breathing exercises activate the parasympathetic nervous system and reduce stress hormones within minutes.
     Box breathing: inhale for 4 counts, hold for 4, exhale for 4, hold for 4. Repeat 4-6 times.
     4-7-8 breathing: inhale for 4 counts, hold for 7, exhale slowly for 8. This promotes relaxation and can aid sleep.
-    Diaphragmatic breathing: breathe into your belly, not chest. Only the belly hand should rise.
-    Alternate nostril breathing from yoga reduces stress and improves focus.""",
-
+    Diaphragmatic breathing: breathe into your belly, not chest. Only the belly hand should rise.""",
     """Mindfulness is the practice of non-judgmental present-moment awareness. It reduces rumination, stress, and emotional reactivity.
-    Body scan meditation: slowly move attention from feet to head, noticing sensations without judgment. Takes 5-20 minutes.
-    MBSR (Mindfulness-Based Stress Reduction) is an 8-week program proven to reduce anxiety, depression, and chronic pain.
-    Mindful walking: walk slowly, feel each step, notice your breath and surroundings.
+    Body scan meditation: slowly move attention from feet to head, noticing sensations without judgment.
     Journaling 3 things you are grateful for daily rewires the brain toward positivity and reduces depression over time.""",
-
     """Crisis resources: If you are in immediate danger, call emergency services (911 in USA, 115 in Pakistan, 999 in UK).
     Pakistan crisis line: Umang helpline 0317-4288665, available Monday-Saturday 3pm-9pm.
-    iCall India: 9152987821. Vandrevala Foundation 24/7: 1860-2662-345.
-    Samaritans UK: 116 123 (free, 24/7). Crisis Text Line US: Text HOME to 741741.
-    Reaching out for help is a sign of strength, not weakness. You are not alone.""",
-
+    Samaritans UK: 116 123 (free, 24/7). Crisis Text Line US: Text HOME to 741741.""",
     """Panic attacks are intense surges of fear that peak within minutes. They are not dangerous but feel terrifying.
     During a panic attack: remind yourself this will pass, I am safe, this is temporary.
-    Cold water on the face triggers the diving reflex and rapidly slows heart rate.
-    Progressive muscle relaxation: systematically tense and release muscle groups from toes to face.
-    Instead of fighting panic, accepting it reduces its power.""",
-
+    Progressive muscle relaxation: systematically tense and release muscle groups from toes to face.""",
     """Stress management involves identifying stressors, building coping resources, and creating recovery time.
-    Time management techniques like the Pomodoro method (25 min focus, 5 min break) reduce overwhelm.
     Setting boundaries at work and in relationships protects mental energy. Saying no is self-care.
-    Nature exposure (even 20 minutes) reduces cortisol.
-    Creative expression such as art, music, and writing provides emotional release and reduces stress hormones.""",
-
+    Nature exposure (even 20 minutes) reduces cortisol.""",
     """Self-care is not selfish. It includes physical, emotional, social, spiritual, and professional dimensions.
-    Physical self-care: regular sleep, nutrition, movement, medical checkups, limiting substances.
-    Emotional self-care: therapy, journaling, processing emotions, setting limits on news and social media.
-    Social self-care: nurturing supportive relationships, spending time with loved ones, seeking community.
     Professional help: therapists, counselors, and psychiatrists provide evidence-based treatment. There is no shame in seeking help."""
 ]
 
-# 2. BUILD RAG
-print("Building RAG knowledge base...")
+print("Building RAG...")
 splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=60)
 docs = []
 for text in MENTAL_HEALTH_DOCS:
-    chunks = splitter.split_text(text)
-    docs.extend([Document(page_content=c) for c in chunks])
+    for chunk in splitter.split_text(text):
+        docs.append(Document(page_content=chunk))
 
 embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2",
@@ -81,30 +58,20 @@ vectorstore = FAISS.from_documents(docs, embeddings)
 retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 print("RAG ready!")
 
-# 3. GROQ CLIENT
 client = Groq(api_key=GROQ_API_KEY)
 MODEL = "llama-3.1-8b-instant"
 
 SYSTEM_PROMPT = (
-    "You are Echo, a compassionate, warm, and knowledgeable mental health companion. "
-    "You are NOT a replacement for professional therapy, but you provide genuine emotional support, "
-    "psychoeducation, and coping strategies.\n\n"
-    "Your personality:\n"
-    "- Warm, empathetic, non-judgmental, and gently encouraging\n"
-    "- You validate feelings before offering advice\n"
-    "- You use simple, accessible language\n"
-    "- You celebrate small wins enthusiastically\n"
-    "- You gently encourage professional help when appropriate\n"
-    "- You never dismiss or minimize someone's pain\n\n"
-    "When a crisis is detected, always provide:\n"
-    "1. Immediate validation and calm presence\n"
-    "2. A grounding technique right away\n"
-    "3. Crisis resources (Pakistan: Umang 0317-4288665, International: iasp.info)\n"
-    "4. Encouragement to reach out to someone they trust\n\n"
-    "Keep responses concise (2-4 paragraphs) unless explaining a technique."
+    "You are Echo, a compassionate, warm mental health companion. "
+    "NOT a replacement for therapy. Provide genuine emotional support and coping strategies.\n"
+    "- Validate feelings before offering advice\n"
+    "- Keep responses concise (2-4 paragraphs)\n"
+    "- Use simple, warm language\n"
+    "- Encourage professional help when appropriate\n"
+    "When crisis detected: immediate validation, grounding technique, "
+    "crisis resources (Pakistan: Umang 0317-4288665), encourage reaching out."
 )
 
-# 4. CRISIS DETECTION
 CRISIS_KEYWORDS = [
     r"\bsuicid", r"\bkill myself\b", r"\bend my life\b", r"\bwant to die\b",
     r"\bno reason to live\b", r"\bhurt myself\b", r"\bself.harm",
@@ -115,30 +82,19 @@ CRISIS_KEYWORDS = [
 def detect_crisis(text):
     return any(re.search(kw, text.lower()) for kw in CRISIS_KEYWORDS)
 
-# 5. CHAT STORAGE - use /tmp for HuggingFace
-CHAT_FILE = "/tmp/echo_chat_history.json"
+def clean_for_api(text):
+    return text.encode('ascii', 'ignore').decode('ascii')
 
-# 5. CHAT STORAGE - Disabled global file to ensure user privacy
+def retrieve_context(query):
+    results = retriever.invoke(query)
+    return "\n\n".join([d.page_content for d in results])
 
-def load_history():
-    # Return an empty list so every new visitor gets a fresh, private screen
-    return []
-
-def save_history(history):
-    # Pass does nothing. We let Gradio's gr.State handle the memory privately!
-    pass
-
-def delete_history():
-    # Just clears the screen without looking for a file
-    return []
-
-# 6. TTS
-def text_to_speech(text, lang="en"):
+def text_to_speech(text):
     try:
         clean = re.sub(r'[*_#`]', '', text)
         clean = re.sub(r'\s+', ' ', clean).strip()[:800]
         clean = clean.encode('ascii', 'ignore').decode('ascii')
-        tts = gTTS(text=clean, lang=lang, slow=False)
+        tts = gTTS(text=clean, lang="en", slow=False)
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3", dir="/tmp")
         tts.save(tmp.name)
         return tmp.name
@@ -146,347 +102,44 @@ def text_to_speech(text, lang="en"):
         print(f"TTS error: {e}")
         return None
 
-# 7. RAG RETRIEVAL
-def retrieve_context(query):
-    results = retriever.invoke(query)
-    return "\n\n".join([d.page_content for d in results])
-
-# 8. MAIN CHAT
-MAX_CONTEXT_TURNS = 8
-
-def clean_for_api(text):
-    return text.encode('ascii', 'ignore').decode('ascii')
-
-def chat_with_echo(user_message, conversation_history, enable_rag=True):
+def chat_with_echo(user_message, conversation_history):
     is_crisis = detect_crisis(user_message)
     messages = [{"role": "system", "content": clean_for_api(SYSTEM_PROMPT)}]
-
-    if enable_rag:
-        ctx = retrieve_context(user_message)
-        if ctx:
-            messages.append({"role": "system", "content": clean_for_api("Relevant knowledge (weave naturally):\n" + ctx)})
-
+    ctx = retrieve_context(user_message)
+    if ctx:
+        messages.append({"role": "system", "content": clean_for_api("Relevant knowledge:\n" + ctx)})
     if is_crisis:
-        messages.append({"role": "system", "content": "IMPORTANT: This person may be in crisis. Respond with immediate warmth, a brief grounding exercise, crisis resources (Pakistan: Umang 0317-4288665), and encourage them to seek help now."})
-
-    for turn in conversation_history[-(MAX_CONTEXT_TURNS * 2):]:
+        messages.append({"role": "system", "content": "CRISIS DETECTED: respond with warmth, grounding, crisis resources (Umang 0317-4288665)."})
+    for turn in conversation_history[-16:]:
         messages.append({"role": turn["role"], "content": clean_for_api(turn["content"])})
-
     messages.append({"role": "user", "content": clean_for_api(user_message)})
-
-    response = client.chat.completions.create(
-        model=MODEL, messages=messages, max_tokens=600, temperature=0.75
-    )
+    response = client.chat.completions.create(model=MODEL, messages=messages, max_tokens=600, temperature=0.75)
     reply = response.choices[0].message.content
-
     conversation_history.append({"role": "user", "content": user_message})
     conversation_history.append({"role": "assistant", "content": reply})
-    save_history(conversation_history)
+    return reply, conversation_history, is_crisis
 
-    return reply, text_to_speech(reply), conversation_history, is_crisis
-
-# 9. MOOD RESPONSES
 MOOD_PROMPTS = {
-    "😊 Happy": "The user is feeling happy. Respond with genuine excitement, celebrate with them, ask what's making them happy, and encourage them to savour this feeling.",
-    "😢 Sad": "The user is feeling sad. Respond with deep empathy, validate that sadness is okay, gently ask what's going on, and offer one small comforting suggestion.",
-    "😰 Anxious": "The user is feeling anxious. Respond calmly, validate their anxiety, immediately offer box breathing (inhale 4, hold 4, exhale 4), and remind them anxiety passes.",
-    "😤 Angry": "The user is feeling angry. Validate their anger without judgment, acknowledge it is a valid emotion, help them identify what might be underneath it.",
-    "😴 Tired": "The user is feeling tired. Show compassion, ask if it is physical or emotional tiredness, gently affirm that rest is productive, and suggest one simple self-care action.",
-    "😕 Lost": "The user is feeling lost and confused about life. Respond with deep understanding, normalize feeling lost, remind them uncertainty is part of growth.",
-    "🥰 Grateful": "The user is feeling grateful. Celebrate this with them genuinely, explore what they are grateful for, explain the science of gratitude briefly.",
-    "😶 Numb": "The user is feeling numb and disconnected. Respond with care, normalize emotional numbness as a protective response, and suggest a gentle grounding technique."
+    "😊 Happy":    "The user is feeling happy. Celebrate with them, ask what's making them happy.",
+    "😢 Sad":      "The user is feeling sad. Deep empathy, validate sadness, gently ask what's going on.",
+    "😰 Anxious":  "The user is feeling anxious. Validate, offer box breathing (inhale 4, hold 4, exhale 4).",
+    "😤 Angry":    "The user is feeling angry. Validate without judgment, help identify what's underneath.",
+    "😴 Tired":    "The user is feeling tired. Compassion, ask if physical or emotional tiredness.",
+    "😕 Lost":     "The user is feeling lost. Deep understanding, normalize uncertainty as part of growth.",
+    "🥰 Grateful": "The user is feeling grateful. Celebrate genuinely, explore what they're grateful for.",
+    "😶 Numb":     "The user is feeling numb. Normalize as protective response, suggest gentle grounding.",
 }
 
-def handle_mood(mood_label, conversation_history):
-    prompt = MOOD_PROMPTS.get(mood_label, f"The user is feeling {mood_label}. Respond empathetically.")
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {"role": "system", "content": clean_for_api(SYSTEM_PROMPT)},
-            {"role": "user", "content": clean_for_api(prompt)}
-        ],
-        max_tokens=300, temperature=0.8
-    )
-    reply = response.choices[0].message.content
-    conversation_history.append({"role": "user", "content": f"[Mood: {mood_label}]"})
-    conversation_history.append({"role": "assistant", "content": reply})
-    save_history(conversation_history)
-    return reply, text_to_speech(reply), conversation_history
-
-# 10. COPING TOOLS
 COPING_TOOLS = {
-    "Box Breathing": {
-        "text": "**Box Breathing (4-4-4-4)**\n\n1. Inhale through your nose for 4 counts\n2. Hold for 4 counts\n3. Exhale through your mouth for 4 counts\n4. Hold empty for 4 counts\n\nRepeat 4-6 times. You will feel calmer within 2 minutes.",
-        "tts": "Breathe in for 4. 1, 2, 3, 4. Hold for 4. 1, 2, 3, 4. Breathe out for 4. 1, 2, 3, 4. Hold for 4. 1, 2, 3, 4. Repeat 4 to 6 times."
-    },
-    "5-4-3-2-1 Grounding": {
-        "text": "**5-4-3-2-1 Grounding**\n\n- 5 things you can SEE\n- 4 things you can TOUCH\n- 3 things you can HEAR\n- 2 things you can SMELL\n- 1 thing you can TASTE\n\nThis interrupts the anxiety cycle by anchoring you to the present.",
-        "tts": "Name 5 things you can see. Now 4 things you can touch. Listen for 3 sounds. Notice 2 things you can smell. And 1 thing you can taste. You are here. You are safe."
-    },
-    "Thought Reframing": {
-        "text": "**Cognitive Reframing**\n\n1. Identify the negative thought\n2. Ask: Is this 100% true? What is the evidence?\n3. Ask: What would I tell a friend thinking this?\n4. Replace with a kinder, more realistic version\n\nExample: 'I always fail' becomes 'I struggled here, but I have also succeeded many times.'",
-        "tts": "Identify the negative thought. Ask: is this completely true? What would you say to a friend? Now find a more balanced, kinder way to see the situation."
-    },
-    "Body Scan": {
-        "text": "**Body Scan Meditation**\n\n1. Close your eyes and take 3 deep breaths\n2. Bring attention to your feet\n3. Slowly move up through calves, thighs, hips, belly\n4. Continue through chest, shoulders, arms, hands\n5. Finish at neck, face, top of head\n\nAt each area, breathe into tension and release it on the exhale.",
-        "tts": "Close your eyes. Take three deep breaths. Bring attention to your feet. Breathe into any tension. Slowly move up through your legs, hips, belly, chest, shoulders, arms, and hands. Finally your neck and face. Release any tension you find."
-    },
-    "Gratitude Practice": {
-        "text": "**Gratitude Practice**\n\nThink of 3 things you are grateful for right now. They can be tiny:\n- A warm drink\n- Someone who made you smile\n- Your body keeping you alive\n\nWrite them down if you can. Do this every morning for 21 days.",
-        "tts": "Think of three things you are grateful for. They can be small. Maybe warmth, someone who made you smile, or simply that you are here. Let yourself feel the gratitude for each one."
-    },
-    "Affirmations": {
-        "text": "**Positive Affirmations**\n\nSay these slowly, out loud if possible:\n\n- I am worthy of love and belonging.\n- This feeling is temporary and will pass.\n- I have survived hard days before and I can do it again.\n- I am doing the best I can with what I have.\n- My resilience defines me, not my struggles.\n\nChoose one that resonates. Repeat it 5 times.",
-        "tts": "I am worthy of love and belonging. This feeling is temporary and will pass. I have survived hard days before. I am doing the best I can. My resilience defines me. Choose the one that speaks to you and say it five times."
-    }
+    "🫁 Box Breathing":       "Guide me through box breathing step by step right now.",
+    "🌱 5-4-3-2-1 Grounding": "Walk me through the 5-4-3-2-1 grounding technique right now.",
+    "🧠 Thought Reframing":   "Help me reframe a negative thought using CBT techniques.",
+    "🧘 Body Scan":           "Guide me through a body scan meditation right now.",
+    "🙏 Gratitude Practice":  "Guide me through a gratitude practice right now.",
+    "💪 Affirmations":        "Give me powerful affirmations for right now.",
 }
 
-# 11. RESOURCES
-RESOURCES_TEXT = """## Emergency and Mental Health Resources
-
-### Pakistan
-- **Umang Helpline:** 0317-4288665 (Mon-Sat, 3pm-9pm)
-- **Rozan Counselling:** 051-2890505
-- **Emergency:** 115 or 1122
-
-### International
-- **Crisis Text Line (US):** Text HOME to 741741
-- **Samaritans (UK):** 116 123 (24/7, free)
-- **Lifeline (Australia):** 13 11 14
-- **iCall (India):** 9152987821
-- **Directory:** iasp.info/resources/Crisis_Centres
-
-### Online Support
-- **7 Cups:** 7cups.com
-- **BetterHelp:** betterhelp.com
-
-Reaching out is a sign of strength. You deserve support."""
-
-RESOURCES_TTS = "In Pakistan, call Umang at 0317-4288665, Monday through Saturday, 3pm to 9pm. For emergencies call 115. In the US, text HOME to 741741. In the UK, Samaritans is at 116 123, available 24 hours. Visit iasp.info for your local crisis centre. Reaching out for help is one of the bravest things you can do. You are not alone."
-
-# UI
-# UI
-CUSTOM_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-
-:root {
-    --bg-main: #212121;
-    --bg-sidebar: #171717;
-    --text-primary: #ECECEC;
-    --text-secondary: #B4B4B4;
-    --border-light: rgba(255, 255, 255, 0.1);
-    --msg-user: #2F2F2F;
-    --msg-bot: transparent;
-    --input-bg: #2F2F2F;
-    --accent: #FFFFFF;
-    --accent-hover: #ECECEC;
-    --radius-full: 9999px;
-    --radius-xl: 24px;
-    --radius-lg: 16px;
-    --radius-md: 8px;
-}
-
-/* Base Body */
-body, .gradio-container {
-    background-color: var(--bg-main) !important;
-    color: var(--text-primary) !important;
-    font-family: 'Inter', -apple-system, sans-serif !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    height: 100vh !important;
-    overflow: hidden !important;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #565656; }
-
-/* Force Text Colors */
-p, h1, h2, h3, h4, span, div, label, li, a { color: var(--text-primary) !important; }
-.text-muted { color: var(--text-secondary) !important; }
-
-/* Main Layout Grid */
-.main-layout {
-    display: flex !important;
-    flex-direction: row !important;
-    height: 100vh !important;
-    width: 100vw !important;
-    gap: 0 !important;
-    margin: 0 !important;
-    border: none !important;
-    background: transparent !important;
-}
-
-/* -----------------------------
-   SIDEBAR STYLING
------------------------------ */
-.sidebar {
-    background-color: var(--bg-sidebar) !important;
-    width: 260px !important;
-    min-width: 260px !important;
-    max-width: 260px !important;
-    height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    padding: 16px 12px !important;
-    border-right: none !important;
-}
-
-.new-chat-btn {
-    background: transparent !important;
-    color: var(--text-primary) !important;
-    border: none !important;
-    border-radius: var(--radius-md) !important;
-    padding: 12px 14px !important;
-    text-align: left !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    display: flex !important;
-    justify-content: flex-start !important;
-    transition: background 0.2s !important;
-}
-.new-chat-btn:hover { background: #202123 !important; }
-
-.sidebar-tools {
-    margin-top: 32px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 8px !important;
-}
-
-.tool-btn {
-    background: transparent !important;
-    border: none !important;
-    color: var(--text-primary) !important;
-    text-align: left !important;
-    font-size: 13px !important;
-    padding: 10px 14px !important;
-    border-radius: var(--radius-md) !important;
-}
-.tool-btn:hover { background: #202123 !important; }
-
-/* -----------------------------
-   CHAT AREA STYLING
------------------------------ */
-.chat-container {
-    flex-grow: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    height: 100vh !important;
-    position: relative !important;
-    background-color: var(--bg-main) !important;
-}
-
-.chatbot-wrap {
-    flex-grow: 1 !important;
-    background-color: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    overflow-y: auto !important;
-    margin-bottom: 90px !important; /* Space for input */
-}
-
-/* Chat Messages */
-.message-wrap { gap: 0 !important; padding: 24px 0 !important; }
-
-/* Center the chat content */
-.message {
-    max-width: 768px !important; /* Standard ChatGPT width */
-    margin: 0 auto !important;
-    padding: 12px 24px !important;
-    width: 100% !important;
-}
-
-/* User Message: Grey rounded bubble on the right */
-.message.user {
-    background-color: var(--msg-user) !important;
-    border: none !important;
-    border-radius: var(--radius-xl) !important;
-    width: fit-content !important;
-    max-width: 70% !important;
-    margin-left: auto !important;
-    margin-right: 24px !important;
-    padding: 12px 20px !important;
-    font-size: 16px !important;
-}
-
-/* Bot Message: Transparent, full width text */
-.message.bot {
-    background-color: var(--msg-bot) !important;
-    border: none !important;
-    border-radius: 0 !important;
-    margin-left: 0 !important;
-    font-size: 16px !important;
-}
-.message.bot p { line-height: 1.6 !important; }
-
-/* -----------------------------
-   INPUT AREA STYLING
------------------------------ */
-.input-wrapper {
-    position: absolute !important;
-    bottom: 24px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: 100% !important;
-    max-width: 768px !important;
-    padding: 0 24px !important;
-    background: transparent !important;
-    border: none !important;
-}
-
-.input-box {
-    background-color: var(--input-bg) !important;
-    border: 1px solid var(--border-light) !important;
-    border-radius: var(--radius-xl) !important;
-    padding: 4px 16px !important;
-    display: flex !important;
-    align-items: center !important;
-    box-shadow: 0 0 15px rgba(0,0,0,0.1) !important;
-}
-
-textarea, input[type="text"] {
-    background-color: transparent !important;
-    border: none !important;
-    color: var(--text-primary) !important;
-    font-size: 16px !important;
-    box-shadow: none !important;
-    padding: 14px 0 !important;
-    resize: none !important;
-}
-textarea:focus { border: none !important; box-shadow: none !important; outline: none !important; }
-
-/* Send Button: White circle */
-button.send-btn {
-    background-color: var(--accent) !important;
-    color: #000000 !important;
-    border: none !important;
-    border-radius: var(--radius-full) !important;
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
-    padding: 0 !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    font-weight: bold !important;
-    cursor: pointer !important;
-}
-button.send-btn:hover { background-color: var(--accent-hover) !important; }
-button.send-btn span { color: #000000 !important; display: none; } /* Hide text if we just want a shape */
-button.send-btn::after { content: "↑"; font-size: 20px; color: black; }
-
-/* Hide default Gradio elements */
-.form { border: none !important; background: transparent !important; box-shadow: none !important; }
-footer { display: none !important; }
-"""
-
-# ==========================================
-# 5. GRADIO APP DEFINITION
-# ==========================================
-def format_chat_for_gradio(history):
+def format_for_gradio(history):
     messages = []
     i = 0
     while i < len(history) - 1:
@@ -500,74 +153,597 @@ def format_chat_for_gradio(history):
 
 def on_send(message, history_state, enable_tts):
     if not message.strip():
-        return history_state, format_chat_for_gradio(history_state), None, ""
-    reply, audio_path, updated_history, is_crisis = chat_with_echo(message, history_state)
-    crisis_msg = "**Crisis support activated:** Umang 0317-4288665" if is_crisis else ""
-    return updated_history, format_chat_for_gradio(updated_history), (audio_path if enable_tts else None), crisis_msg
+        return history_state, format_for_gradio(history_state), None, ""
+    reply, updated, is_crisis = chat_with_echo(message, history_state)
+    crisis_msg = "🆘 **Crisis lines:** 🇵🇰 Umang **0317-4288665** · 🇺🇸 **988** · 🇬🇧 **116 123** · Emergency **1122**" if is_crisis else ""
+    audio = text_to_speech(reply) if enable_tts else None
+    return updated, format_for_gradio(updated), audio, crisis_msg
+
+def on_quick(message, history_state, enable_tts):
+    if not message.strip():
+        return history_state, format_for_gradio(history_state), None, ""
+    reply, updated, is_crisis = chat_with_echo(message, history_state)
+    audio = text_to_speech(reply) if enable_tts else None
+    return updated, format_for_gradio(updated), audio, ""
 
 def clear_chat():
     return [], [], None, ""
 
-# Use Base theme to block Gradio styling overrides
-with gr.Blocks(theme=gr.themes.Base(), css=CUSTOM_CSS, title="Echo") as app:
+CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Syne:wght@400;500;600&display=swap');
+
+:root {
+    --bg:       #0d0f14;
+    --bg2:      #13161d;
+    --bg3:      #1a1d26;
+    --bg4:      #20242e;
+    --border:   #2a2d38;
+    --border2:  #343844;
+    --text:     #e8eaf0;
+    --text2:    #9ba3b4;
+    --text3:    #555e72;
+    --green:    #4ade80;
+    --green2:   #22c55e;
+    --gdim:     #1a3d27;
+    --amber:    #fbbf24;
+    --red:      #f87171;
+    --rdim:     #3d1515;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { background: var(--bg) !important; height: 100%; }
+
+.gradio-container {
+    background: var(--bg) !important;
+    color: var(--text) !important;
+    font-family: 'Syne', system-ui, sans-serif !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+footer, .footer, .svelte-1ax1toq { display: none !important; }
+.contain { padding: 0 !important; }
+.gap { gap: 0 !important; }
+.form, .gr-form, .gr-group {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+/* ── HEADER ───────────────────────────────── */
+#echo-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 200;
+}
+.h-left { display: flex; align-items: center; gap: 9px; }
+.h-orb {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    background: radial-gradient(circle at 35% 30%, #86efac, #4ade80 55%, #15803d);
+    font-size: 13px; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 12px rgba(74,222,128,0.45);
+    animation: hglow 3s ease-in-out infinite;
+}
+@keyframes hglow {
+    0%,100% { box-shadow: 0 0 8px rgba(74,222,128,0.3); }
+    50%      { box-shadow: 0 0 20px rgba(74,222,128,0.6); }
+}
+.h-title {
+    font-family: 'Playfair Display', serif !important;
+    font-size: 16px !important; font-weight: 700 !important;
+    color: var(--text) !important; line-height: 1.1 !important;
+}
+.h-sub { font-size: 10px !important; color: var(--text3) !important; margin-top: 1px !important; }
+.h-badge {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 9px; color: var(--green); font-weight: 600;
+    letter-spacing: 0.07em; text-transform: uppercase;
+    background: rgba(74,222,128,0.07);
+    border: 1px solid rgba(74,222,128,0.2);
+    padding: 3px 9px; border-radius: 99px;
+}
+.h-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--green); animation: blink 2.5s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.15} }
+
+/* ── TABS ─────────────────────────────────── */
+.tabs > .tab-nav {
+    background: var(--bg2) !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding: 0 12px !important;
+    gap: 0 !important;
+}
+.tab-nav button {
+    font-family: 'Syne', sans-serif !important;
+    font-size: 11px !important; font-weight: 500 !important;
+    color: var(--text3) !important;
+    background: transparent !important; border: none !important;
+    border-bottom: 2px solid transparent !important;
+    padding: 9px 12px !important; border-radius: 0 !important;
+    transition: all 0.2s !important; white-space: nowrap !important;
+}
+.tab-nav button:hover { color: var(--text2) !important; }
+.tab-nav button.selected, .tab-nav button[aria-selected="true"] {
+    color: var(--green) !important;
+    border-bottom-color: var(--green) !important;
+    font-weight: 600 !important;
+}
+
+/* ── CRISIS BANNER ────────────────────────── */
+#crisis-out .prose, #crisis-out p {
+    background: rgba(248,113,113,0.07) !important;
+    border-bottom: 1px solid rgba(248,113,113,0.2) !important;
+    padding: 8px 14px !important;
+    font-size: 12px !important;
+    color: var(--red) !important;
+    margin: 0 !important;
+}
+#crisis-out strong { color: var(--red) !important; }
+#crisis-out:empty, #crisis-out .prose:empty { display: none !important; padding: 0 !important; }
+
+/* ── PILL BARS ────────────────────────────── */
+.pill-bar {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 5px !important;
+    padding: 8px 12px !important;
+    background: var(--bg2) !important;
+    border-bottom: 1px solid var(--border) !important;
+    align-items: center !important;
+}
+.pill-bar-label {
+    font-size: 9px !important;
+    color: var(--text3) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.07em !important;
+    text-transform: uppercase !important;
+    margin-right: 3px !important;
+    flex-shrink: 0 !important;
+    align-self: center !important;
+}
+
+/* Native HTML pills — no Gradio interference */
+.echo-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    background: var(--bg3) !important;
+    border: 1px solid var(--border2) !important;
+    color: var(--text2) !important;
+    font-family: 'Syne', sans-serif !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    padding: 4px 11px !important;
+    border-radius: 99px !important;
+    cursor: pointer !important;
+    transition: all 0.15s !important;
+    white-space: nowrap !important;
+    line-height: 1.4 !important;
+    -webkit-tap-highlight-color: transparent !important;
+    user-select: none !important;
+}
+.echo-pill:hover, .echo-pill:active {
+    background: var(--bg4) !important;
+    border-color: rgba(74,222,128,0.4) !important;
+    color: var(--green) !important;
+}
+.echo-pill-tool {
+    background: transparent !important;
+    border-color: var(--border) !important;
+    color: var(--text3) !important;
+    font-size: 10px !important;
+    padding: 3px 10px !important;
+}
+.echo-pill-tool:hover, .echo-pill-tool:active {
+    background: rgba(74,222,128,0.05) !important;
+    border-color: rgba(74,222,128,0.3) !important;
+    color: var(--green) !important;
+}
+
+/* ── CHATBOT ──────────────────────────────── */
+#chatbot-main {
+    background: transparent !important;
+    border: none !important;
+}
+#chatbot-main > div { background: transparent !important; border: none !important; }
+
+.message-wrap { padding: 4px 12px !important; }
+
+.user .message, .user > div {
+    background: var(--bg3) !important;
+    border: 1px solid var(--border2) !important;
+    color: var(--text) !important;
+    border-radius: 16px 16px 3px 16px !important;
+    font-size: 13px !important; line-height: 1.7 !important;
+    padding: 10px 14px !important;
+    max-width: 80% !important;
+    margin-left: auto !important;
+    font-family: 'Syne', sans-serif !important;
+}
+.bot .message, .bot > div {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text) !important;
+    font-size: 13px !important; line-height: 1.8 !important;
+    padding: 8px 2px !important;
+    font-family: 'Syne', sans-serif !important;
+}
+.bot .message strong, .bot > div strong { color: var(--green) !important; font-weight: 600 !important; }
+.bot .message em, .bot > div em { color: var(--amber) !important; }
+.bot .message code, .bot > div code {
+    background: rgba(74,222,128,0.1) !important; color: var(--green) !important;
+    padding: 1px 5px !important; border-radius: 4px !important; font-size: 11px !important;
+}
+.bot .message ul, .bot .message ol,
+.bot > div ul, .bot > div ol { padding-left: 16px !important; margin: 4px 0 !important; }
+.bot .message li, .bot > div li { margin-bottom: 3px !important; font-size: 13px !important; }
+
+.avatar-container { display: none !important; }
+
+/* ── BOTTOM BAR ───────────────────────────── */
+#bottom-bar {
+    background: var(--bg2) !important;
+    border-top: 1px solid var(--border) !important;
+    padding: 8px 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+}
+
+/* TTS toggle — compact */
+#tts-toggle {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+#tts-track {
+    width: 34px !important; height: 18px !important;
+    background: var(--border2) !important;
+    border-radius: 99px !important;
+    position: relative !important;
+    transition: background 0.2s !important;
+    flex-shrink: 0 !important;
+}
+#tts-track.on { background: var(--green) !important; }
+#tts-thumb {
+    width: 14px !important; height: 14px !important;
+    background: white !important; border-radius: 50% !important;
+    position: absolute !important; top: 2px !important; left: 2px !important;
+    transition: left 0.2s !important;
+}
+#tts-track.on #tts-thumb { left: 18px !important; }
+#tts-label { font-size: 11px !important; color: var(--text3) !important; font-family: 'Syne', sans-serif !important; }
+
+/* Clear button — compact text link style */
+#clear-btn-html {
+    margin-left: auto !important;
+    background: transparent !important;
+    border: 1px solid rgba(248,113,113,0.25) !important;
+    color: var(--red) !important;
+    font-family: 'Syne', sans-serif !important;
+    font-size: 11px !important;
+    padding: 4px 12px !important;
+    border-radius: 99px !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    transition: all 0.15s !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+#clear-btn-html:hover, #clear-btn-html:active {
+    background: var(--rdim) !important;
+    border-color: var(--red) !important;
+}
+
+/* ── INPUT AREA ───────────────────────────── */
+#input-area {
+    padding: 8px 12px 10px !important;
+    background: var(--bg) !important;
+    border-top: 1px solid var(--border) !important;
+}
+#input-inner {
+    display: flex !important;
+    align-items: flex-end !important;
+    gap: 7px !important;
+    background: var(--bg2) !important;
+    border: 1.5px solid var(--border2) !important;
+    border-radius: 14px !important;
+    padding: 5px 5px 5px 14px !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+#input-inner:focus-within {
+    border-color: rgba(74,222,128,0.45) !important;
+    box-shadow: 0 0 0 3px rgba(74,222,128,0.07) !important;
+}
+#msg-input {
+    flex: 1 !important;
+    background: transparent !important;
+    border: none !important; box-shadow: none !important; outline: none !important;
+}
+#msg-input textarea, #msg-input input {
+    background: transparent !important;
+    border: none !important; box-shadow: none !important; outline: none !important;
+    color: var(--text) !important;
+    font-family: 'Syne', sans-serif !important;
+    font-size: 14px !important; line-height: 1.5 !important;
+    resize: none !important;
+    padding: 6px 0 !important;
+    min-height: 36px !important; max-height: 120px !important;
+}
+#msg-input textarea::placeholder { color: var(--text3) !important; }
+
+#send-btn {
+    width: 34px !important; height: 34px !important; min-width: 34px !important;
+    border-radius: 50% !important;
+    background: var(--green) !important; border: none !important;
+    color: #071a0f !important; font-size: 16px !important; font-weight: 900 !important;
+    display: flex !important; align-items: center !important; justify-content: center !important;
+    cursor: pointer !important; flex-shrink: 0 !important;
+    transition: all 0.18s !important; padding: 0 !important; margin-bottom: 1px !important;
+    line-height: 1 !important;
+}
+#send-btn:hover { background: var(--green2) !important; transform: scale(1.08) !important; }
+#send-btn:disabled { opacity: 0.25 !important; transform: none !important; }
+
+.input-hint {
+    text-align: center !important;
+    font-size: 10px !important; color: var(--text3) !important;
+    margin-top: 6px !important; line-height: 1.5 !important;
+    font-family: 'Syne', sans-serif !important;
+}
+
+#audio-out { display: none !important; }
+
+/* ── RESOURCES TAB ────────────────────────── */
+.res-wrap { padding: 12px; }
+.res-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
+}
+.res-card h3 {
+    font-family: 'Playfair Display', serif !important;
+    font-size: 13px !important; margin-bottom: 9px !important;
+}
+.res-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 9px; background: var(--bg3); border-radius: 7px;
+    margin-bottom: 4px; border: 1px solid var(--border);
+}
+.res-name { font-size: 12px !important; font-weight: 600 !important; color: var(--text) !important; }
+.res-desc { font-size: 10px !important; color: var(--text3) !important; }
+.res-num  { font-size: 11px !important; font-weight: 700 !important; flex-shrink: 0; margin-left: 8px; }
+"""
+
+RESOURCES_HTML = """<div class="res-wrap">
+  <div class="res-card">
+    <h3 style="color:#f87171">🇵🇰 Pakistan</h3>
+    <div class="res-row"><div><div class="res-name">Emergency Rescue</div><div class="res-desc">Police / Ambulance</div></div><div class="res-num" style="color:#f87171;font-size:17px">1122</div></div>
+    <div class="res-row"><div><div class="res-name">Umang Helpline</div><div class="res-desc">Mental Health 24/7</div></div><div class="res-num" style="color:#4ade80">0317-4288665</div></div>
+    <div class="res-row"><div><div class="res-name">Taskeen</div><div class="res-desc">Psychological support</div></div><div class="res-num" style="color:#4ade80">0316-8275336</div></div>
+    <div class="res-row"><div><div class="res-name">Rozan Counselling</div><div class="res-desc">Islamabad</div></div><div class="res-num" style="color:#4ade80">051-2890505</div></div>
+    <div class="res-row"><div><div class="res-name">Edhi Foundation</div><div class="res-desc">Crisis & rescue</div></div><div class="res-num" style="color:#f87171;font-size:17px">115</div></div>
+  </div>
+  <div class="res-card">
+    <h3 style="color:#4ade80">🌍 International</h3>
+    <div class="res-row"><div><div class="res-name">USA / Canada</div><div class="res-desc">Suicide & Crisis Lifeline</div></div><div class="res-num" style="color:#4ade80;font-size:17px">988</div></div>
+    <div class="res-row"><div><div class="res-name">UK — Samaritans</div><div class="res-desc">Free 24/7</div></div><div class="res-num" style="color:#4ade80">116 123</div></div>
+    <div class="res-row"><div><div class="res-name">Australia Lifeline</div></div><div class="res-num" style="color:#4ade80">13 11 14</div></div>
+    <div class="res-row"><div><div class="res-name">India — iCall</div><div class="res-desc">TISS helpline</div></div><div class="res-num" style="color:#4ade80">9152987821</div></div>
+    <div class="res-row"><div><div class="res-name">Crisis Text (US)</div><div class="res-desc">Text HOME → 741741</div></div><div class="res-num">💬</div></div>
+    <div class="res-row"><div><div class="res-name">Global Directory</div><div class="res-desc">findahelpline.com</div></div><div class="res-num">🌐</div></div>
+  </div>
+  <div style="text-align:center;font-size:10px;color:#555e72;padding:4px 0 8px;line-height:1.7">
+    ⚠️ Echo is not a substitute for professional help.<br>
+    Immediate danger → <strong style="color:#f87171">1122</strong> (PK) · <strong style="color:#f87171">911</strong> (US) · <strong style="color:#f87171">999</strong> (UK)
+  </div>
+</div>"""
+
+# Pure HTML pill bars + custom toggle + clear — no Gradio buttons
+MOOD_BAR_HTML = """
+<div class="pill-bar" id="mood-bar">
+  <span class="pill-bar-label">Mood</span>
+  <button class="echo-pill" onclick="echoPill('mood','😊 Happy')">😊 Happy</button>
+  <button class="echo-pill" onclick="echoPill('mood','😢 Sad')">😢 Sad</button>
+  <button class="echo-pill" onclick="echoPill('mood','😰 Anxious')">😰 Anxious</button>
+  <button class="echo-pill" onclick="echoPill('mood','😤 Angry')">😤 Angry</button>
+  <button class="echo-pill" onclick="echoPill('mood','😴 Tired')">😴 Tired</button>
+  <button class="echo-pill" onclick="echoPill('mood','😕 Lost')">😕 Lost</button>
+  <button class="echo-pill" onclick="echoPill('mood','🥰 Grateful')">🥰 Grateful</button>
+  <button class="echo-pill" onclick="echoPill('mood','😶 Numb')">😶 Numb</button>
+</div>"""
+
+TOOL_BAR_HTML = """
+<div class="pill-bar" id="tool-bar">
+  <span class="pill-bar-label">Tools</span>
+  <button class="echo-pill echo-pill-tool" onclick="echoPill('tool','🫁 Box Breathing')">🫁 Box Breathing</button>
+  <button class="echo-pill echo-pill-tool" onclick="echoPill('tool','🌱 5-4-3-2-1 Grounding')">🌱 Grounding</button>
+  <button class="echo-pill echo-pill-tool" onclick="echoPill('tool','🧠 Thought Reframing')">🧠 Reframing</button>
+  <button class="echo-pill echo-pill-tool" onclick="echoPill('tool','🧘 Body Scan')">🧘 Body Scan</button>
+  <button class="echo-pill echo-pill-tool" onclick="echoPill('tool','🙏 Gratitude Practice')">🙏 Gratitude</button>
+  <button class="echo-pill echo-pill-tool" onclick="echoPill('tool','💪 Affirmations')">💪 Affirmations</button>
+</div>"""
+
+BOTTOM_BAR_HTML = """
+<div id="bottom-bar">
+  <div id="tts-toggle" onclick="echoToggleTTS()">
+    <div id="tts-track"><div id="tts-thumb"></div></div>
+    <span id="tts-label">Voice off</span>
+  </div>
+  <button id="clear-btn-html" onclick="echoClear()">🗑 Clear</button>
+</div>"""
+
+# JS bridge: HTML pills → hidden Gradio textbox → Python
+BRIDGE_JS = """
+<script>
+var _echoTTS = false;
+
+function echoToggleTTS() {
+    _echoTTS = !_echoTTS;
+    var track = document.getElementById('tts-track');
+    var label = document.getElementById('tts-label');
+    if (track) track.classList.toggle('on', _echoTTS);
+    if (label) label.textContent = _echoTTS ? 'Voice on' : 'Voice off';
+    // sync to Gradio checkbox
+    var cb = document.querySelector('#tts-checkbox input[type=checkbox]');
+    if (cb && cb.checked !== _echoTTS) { cb.click(); }
+}
+
+function echoPill(type, value) {
+    var box = document.querySelector('#pill-bridge textarea');
+    if (!box) return;
+    var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    nativeInputValueSetter.call(box, type + '::' + value);
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+    setTimeout(function() {
+        var btn = document.querySelector('#pill-send-btn');
+        if (btn) btn.click();
+    }, 80);
+}
+
+function echoClear() {
+    var btn = document.querySelector('#clear-btn-gradio');
+    if (btn) btn.click();
+}
+</script>
+"""
+
+def on_pill(pill_value, history_state, enable_tts):
+    if not pill_value or '::' not in pill_value:
+        return history_state, format_for_gradio(history_state), None, ""
+    pill_type, value = pill_value.split('::', 1)
+    if pill_type == 'mood':
+        prompt = MOOD_PROMPTS.get(value, f"User feels {value}. Respond empathetically.")
+        msg = f"I'm feeling {value.split(' ', 1)[-1] if ' ' in value else value}"
+    else:
+        tool_map = {
+            "🫁 Box Breathing":       "Guide me through box breathing step by step right now.",
+            "🌱 5-4-3-2-1 Grounding": "Walk me through the 5-4-3-2-1 grounding technique right now.",
+            "🧠 Thought Reframing":   "Help me reframe a negative thought using CBT techniques.",
+            "🧘 Body Scan":           "Guide me through a body scan meditation right now.",
+            "🙏 Gratitude Practice":  "Guide me through a gratitude practice right now.",
+            "💪 Affirmations":        "Give me powerful affirmations for right now.",
+        }
+        prompt = tool_map.get(value, value)
+        msg = prompt
+    reply, updated, _ = chat_with_echo(msg, history_state)
+    audio = text_to_speech(reply) if enable_tts else None
+    return updated, format_for_gradio(updated), audio, ""
+
+with gr.Blocks(theme=gr.themes.Base(), css=CSS, title="Echo — Wellness") as app:
     history_state = gr.State([])
 
-    with gr.Row(elem_classes=["main-layout"]):
-        
-        # --- LEFT SIDEBAR ---
-        with gr.Column(elem_classes=["sidebar"], scale=0):
-            # ChatGPT "New Chat" styling
-            new_chat_btn = gr.Button("Echo Wellness", elem_classes=["new-chat-btn"])
-            
-            gr.Markdown("<div style='margin-top:24px; font-size:12px; color:#B4B4B4; padding-left:14px; font-weight:600;'>TOOLS & SETTINGS</div>")
-            
-            tts_toggle = gr.Checkbox(label="Voice Output", value=False, elem_classes=["tool-btn"])
-            clear_btn = gr.Button("Clear Conversation", elem_classes=["tool-btn"])
-            
-            gr.Markdown("<div style='margin-top:auto; font-size:12px; color:#B4B4B4; padding-left:14px;'>Echo UI v2.0</div>")
+    # Inject JS bridge
+    gr.HTML(BRIDGE_JS)
 
-        # --- RIGHT MAIN CHAT AREA ---
-        with gr.Column(elem_classes=["chat-container"], scale=1):
-            
-            crisis_banner = gr.Markdown("", visible=True)
-            
-            # The Chat Display
+    # Header
+    gr.HTML("""<div id="echo-hdr">
+      <div class="h-left">
+        <div class="h-orb">🌿</div>
+        <div>
+          <div class="h-title">Echo</div>
+          <div class="h-sub">Mental Wellness Companion</div>
+        </div>
+      </div>
+      <div class="h-badge"><span class="h-dot"></span>Private</div>
+    </div>""")
+
+    with gr.Tabs():
+
+        # ── TAB 1: CHAT ──────────────────────────────────────────
+        with gr.Tab("💬 Chat"):
+
+            crisis_out = gr.Markdown("", elem_id="crisis-out")
+
+            # Mood pills (pure HTML)
+            gr.HTML(MOOD_BAR_HTML)
+            # Tool pills (pure HTML)
+            gr.HTML(TOOL_BAR_HTML)
+
+            # Chatbot
             chatbot = gr.Chatbot(
-                label="", 
-                elem_classes=["chatbot-wrap"], 
-                type="messages", 
-                show_label=False,
-                height=800
+                label="", elem_id="chatbot-main",
+                type="messages", show_label=False,
+                height=400,
+                placeholder=(
+                    "<div style='text-align:center;padding:50px 16px'>"
+                    "<div style='font-size:34px;margin-bottom:10px'>🌿</div>"
+                    "<div style='font-family:Playfair Display,serif;font-size:16px;"
+                    "color:#9ba3b4;margin-bottom:7px'>Hello, I'm Echo</div>"
+                    "<div style='font-size:12px;color:#555e72;line-height:1.8;max-width:260px;margin:0 auto'>"
+                    "A safe space to share what's on your mind.<br>"
+                    "I'm here to listen — without judgment.</div></div>"
+                ),
             )
-            
-            audio_out = gr.Audio(label="", autoplay=True, visible=False) 
 
-            # The Bottom Input Area
-            with gr.Column(elem_classes=["input-wrapper"]):
-                with gr.Row(elem_classes=["input-box"]):
+            audio_out = gr.Audio(label="", autoplay=True, elem_id="audio-out", visible=False)
+
+            # Bottom bar (pure HTML: TTS toggle + Clear)
+            gr.HTML(BOTTOM_BAR_HTML)
+
+            # Hidden elements for JS bridge
+            with gr.Row(visible=False):
+                tts_checkbox = gr.Checkbox(value=False, elem_id="tts-checkbox")
+                clear_btn    = gr.Button("clear", elem_id="clear-btn-gradio")
+                pill_bridge  = gr.Textbox(value="", elem_id="pill-bridge")
+                pill_send    = gr.Button("send", elem_id="pill-send-btn")
+
+            # Input area
+            with gr.Column(elem_id="input-area"):
+                with gr.Row(elem_id="input-inner"):
                     msg_input = gr.Textbox(
-                        placeholder="Message Echo...", 
-                        show_label=False, 
-                        container=False, 
-                        lines=1,
-                        scale=9
+                        placeholder="Message Echo…",
+                        show_label=False, container=False,
+                        lines=1, max_lines=5,
+                        elem_id="msg-input", scale=9, autofocus=True,
                     )
-                    send_btn = gr.Button("", elem_classes=["send-btn"], scale=1)
+                    send_btn = gr.Button("↑", elem_id="send-btn", scale=0, min_width=38)
 
-    # Event Listeners
+                gr.HTML("""<div class="input-hint">
+                    Echo is not a substitute for professional care &nbsp;·&nbsp;
+                    Crisis: <strong style="color:#555e72">1122</strong> (PK)
+                    · <strong style="color:#555e72">988</strong> (US)
+                    · <strong style="color:#555e72">116 123</strong> (UK)
+                </div>""")
+
+        # ── TAB 2: RESOURCES ─────────────────────────────────────
+        with gr.Tab("📞 Resources"):
+            gr.HTML(RESOURCES_HTML)
+
+    # ── WIRING ───────────────────────────────────────────────────
     send_btn.click(
-        fn=on_send, 
-        inputs=[msg_input, history_state, tts_toggle],
-        outputs=[history_state, chatbot, audio_out, crisis_banner]
+        fn=on_send,
+        inputs=[msg_input, history_state, tts_checkbox],
+        outputs=[history_state, chatbot, audio_out, crisis_out]
     ).then(lambda: "", outputs=[msg_input])
-    
+
     msg_input.submit(
-        fn=on_send, 
-        inputs=[msg_input, history_state, tts_toggle],
-        outputs=[history_state, chatbot, audio_out, crisis_banner]
+        fn=on_send,
+        inputs=[msg_input, history_state, tts_checkbox],
+        outputs=[history_state, chatbot, audio_out, crisis_out]
     ).then(lambda: "", outputs=[msg_input])
-    
-    clear_btn.click(fn=clear_chat, outputs=[history_state, chatbot, audio_out, crisis_banner])
+
+    pill_send.click(
+        fn=on_pill,
+        inputs=[pill_bridge, history_state, tts_checkbox],
+        outputs=[history_state, chatbot, audio_out, crisis_out]
+    ).then(lambda: "", outputs=[pill_bridge])
+
+    clear_btn.click(
+        fn=clear_chat,
+        outputs=[history_state, chatbot, audio_out, crisis_out]
+    )
 
 if __name__ == "__main__":
     app.launch()
